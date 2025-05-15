@@ -1,0 +1,38 @@
+Hi, i need to make a blackjack simulator to determine a house edge. 
+
+It needs to be simulated exactly like it would be played in real life so that the outcome is accurate. And it needs a few adjustable controls so that i can test different scenarios. 
+
+However, the way the cards are drawn will be the same every time. I dont need to account for any player decisions. 
+
+
+I’ll probably need to run about a million hands. Idk the exact number but enough where the calculated house edge stops moving. Then it should give a report that includes
+- All variables that were input
+- How many total hands were run
+- How many hands the player and dealer won/pushed
+- Number of times that each hand occurred (player total vs dealer total)
+- What the house edge is after averaging out every hand
+
+This is going to be a custom variant of blackjack. But regular blackjack can be used as a base. In this variant the player bets on the dealer hand rather than their own hand.
+
+A lot of these things i might want to adjust but these are the basic rules for the game.
+- The player hits on their hand the same as the dealer.
+- If the player and dealer both bust, the hand pushes.
+- If the player and dealer both get a blackjack, the hand pushes.
+- 5% commission is taken out.
+
+The controls for the simulation are
+- How many hand are run
+- What totals the player hits on. (There should also be a way to check what the dealer up card is when the player hits. But by default, this wont be used.)
+- Hit on soft 17 (There should be a separate control for the player and the dealer).
+- Commission percentage (default 5%)
+- Number of decks in the shoe (default 6)
+- Shoe (shuffle once there are 52 or less cards) or Continuous shuffle (after every hand)
+- Blackjack payout (default 1 to 1)
+- How many players are at the table (default 1)
+
+
+yeah its kind of like baccarat. the player bets that the dealer will win, they draw cards like the dealer, then if the dealer beats their hand, they win.
+
+i guess i would say a list of rules would work best. i want to be able to check the player total and the dealer up card when controlling how the player hits. so for example, i could say, the player always stops on 17 but stops of 15 if the dealer has a 5 or 6. and soft hands need to be controlled separately.
+
+i would want a full breakdown for the outcome frequency tracking. something i could throw in a spreadsheet to get a good visual of everything that’s happening
