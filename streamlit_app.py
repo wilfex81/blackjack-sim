@@ -6,6 +6,7 @@ import os
 import json
 import sys
 import time
+import csv
 from datetime import datetime
 
 # Add the project root to the path so we can use absolute imports
@@ -14,6 +15,187 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from src.simulation.config import SimulationConfig
 from src.simulation.simulator import BlackjackSimulator
 from src.reporting.report_generator import ReportGenerator
+
+# Custom ReportGenerator for the Streamlit app
+class StreamlitReportGenerator:
+    """
+    Streamlit-specific version of ReportGenerator that works with direct results
+    rather than requiring a simulator instance.
+    """
+    
+    def __init__(self, results, config):
+        """
+        Initialize the report generator for Streamlit.
+        
+        Args:
+            results (dict): The simulation results
+            config (SimulationConfig): Configuration used for the simulation
+        """
+        self.results = results
+        self.config = config
+        self.results_dir = os.path.join(os.getcwd(), 'results')
+        
+    def generate_summary(self, filename):
+        """Generate a summary report of the results"""
+        if not self.results:
+            raise ValueError("No simulation results available to report")
+            
+        # Create results directory if it doesn't exist
+        if not os.path.exists(self.results_dir):
+            os.makedirs(self.results_dir)
+            
+        filepath = os.path.join(self.results_dir, filename)
+        
+        # Calculate percentages
+        total_hands = self.results['total_bets']
+        player_win_pct = 100 * self.results['player_wins'] / total_hands if total_hands > 0 else 0
+        dealer_win_pct = 100 * self.results['dealer_wins'] / total_hands if total_hands > 0 else 0
+        push_pct = 100 * self.results['pushes'] / total_hands if total_hands > 0 else 0
+        
+        # Format summary text
+        summary = [
+            f"Simulation Results Summary",
+            f"=========================",
+            f"",
+            f"{self.config}",
+            f"",
+            f"Total hands: {total_hands}",
+            f"Simulation time: {self.results['simulation_time']:.2f} seconds",
+            f"",
+            f"Player wins: {self.results['player_wins']} ({player_win_pct:.2f}%)",
+            f"Dealer wins: {self.results['dealer_wins']} ({dealer_win_pct:.2f}%)",
+            f"Pushes: {self.results['pushes']} ({push_pct:.2f}%)",
+            f"",
+            f"Player busts: {self.results['player_busts']} ({100 * self.results['player_busts'] / total_hands:.2f}%)",
+            f"Dealer busts: {self.results['dealer_busts']} ({100 * self.results['dealer_busts'] / total_hands:.2f}%)",
+            f"",
+            f"House edge: {self.results['house_edge']:.4f}%"
+        ]
+        
+        # Write to file
+        with open(filepath, 'w') as f:
+            f.write("\n".join(summary))
+            
+        print(f"Summary report saved to {filepath}")
+        return filepath
+        
+    def generate_matrix_csv(self, filename):
+        """Generate a CSV file with the outcome matrix data"""
+        if not self.results:
+            raise ValueError("No simulation results available to report")
+            
+        # Create results directory if it doesn't exist
+        if not os.path.exists(self.results_dir):
+            os.makedirs(self.results_dir)
+            
+        filepath = os.path.join(self.results_dir, filename)
+        
+        # Create a 2D matrix from the outcome data
+        outcome_matrix = self.results['outcome_matrix']
+        
+        # Find the maximum values to define matrix dimensions
+        max_player = 21
+        max_dealer = 21
+        for player_total, dealer_total in outcome_matrix.keys():
+            max_player = max(max_player, player_total)
+            max_dealer = max(max_dealer, dealer_total)
+            
+        # Initialize matrix with zeros
+        matrix = []
+        for _ in range(max_player + 1):
+            matrix.append([0] * (max_dealer + 1))
+            
+        # Fill in matrix values
+        for (player_total, dealer_total), count in outcome_matrix.items():
+            if player_total <= max_player and dealer_total <= max_dealer:
+                matrix[player_total][dealer_total] = count
+                
+        # Write matrix to CSV file
+        with open(filepath, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            # Write header row with dealer totals
+            header = ['Player\\Dealer'] + list(range(max_dealer + 1))
+            writer.writerow(header)
+            
+            # Write each player total row
+            for player_total in range(max_player + 1):
+                row = [player_total] + matrix[player_total]
+                writer.writerow(row)
+                
+        print(f"Outcome matrix saved to {filepath}")
+        return filepath
+    
+    def generate_detailed_csv(self, filename):
+        """Generate a detailed CSV report with all outcomes"""
+        if not self.results:
+            raise ValueError("No simulation results available to report")
+            
+        # Create results directory if it doesn't exist
+        if not os.path.exists(self.results_dir):
+            os.makedirs(self.results_dir)
+            
+        filepath = os.path.join(self.results_dir, filename)
+        
+        # Get results details
+        outcome_details = self.results['outcome_details']
+        
+        # Prepare data for CSV
+        detailed_data = []
+        for (player_total, dealer_total, result), count in outcome_details.items():
+            win_loss = "Win" if result == "player_win" else ("Loss" if result == "dealer_win" else "Push")
+            
+            entry = {
+                'player_total': player_total,
+                'dealer_total': dealer_total,
+                'result': win_loss,
+                'count': count,
+                'percentage': (count / self.results['total_bets']) * 100
+            }
+            detailed_data.append(entry)
+            
+        # Sort by player total, then dealer total
+        detailed_data.sort(key=lambda x: (x['player_total'], x['dealer_total'], x['result']))
+        
+        # Write to CSV
+        with open(filepath, 'w', newline='') as csvfile:
+            fieldnames = ['player_total', 'dealer_total', 'result', 'count', 'percentage']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            
+            writer.writeheader()
+            for entry in detailed_data:
+                writer.writerow(entry)
+                
+        print(f"Detailed report saved to {filepath}")
+        return filepath
+    
+    def get_detailed_dataframe(self):
+        """Create a pandas DataFrame from the detailed outcome data for visualization"""
+        if not self.results:
+            raise ValueError("No simulation results available to report")
+            
+        # Get results details
+        outcome_details = self.results['outcome_details']
+        
+        # Prepare data for DataFrame
+        detailed_data = []
+        
+        # Add all player vs dealer outcomes
+        for (player_total, dealer_total, result), count in outcome_details.items():
+            win_loss = "Win" if result == "player_win" else ("Loss" if result == "dealer_win" else "Push")
+            
+            # Create multiple rows for each outcome (one per hand)
+            for _ in range(count):
+                detailed_data.append({
+                    'player_total': player_total,
+                    'dealer_total': dealer_total,
+                    'result': win_loss,
+                    'dealer_upcard': 0  # Placeholder
+                })
+        
+        # Create the DataFrame
+        import pandas as pd
+        return pd.DataFrame(detailed_data)
 
 # Set page configuration
 st.set_page_config(
@@ -236,12 +418,11 @@ with tab1:
         sim_config = SimulationConfig(
             num_decks=config["num_decks"],
             num_hands=config["num_hands"],
-            player_hits_soft_17=config["player_hits_soft_17"],
-            dealer_hits_soft_17=config["dealer_hits_soft_17"],
-            shuffle_method="continuous" if config["shuffle_method"] == "Continuous shuffle" else "threshold",
-            reshuffle_threshold=config.get("reshuffle_threshold", 52),
-            commission=config["commission"] / 100,
-            blackjack_payout=config["blackjack_payout"],
+            player_hit_soft_17=config["player_hits_soft_17"],
+            dealer_hit_soft_17=config["dealer_hits_soft_17"],  
+            reshuffle_cutoff=config.get("reshuffle_threshold", 52) if config["shuffle_method"] != "Continuous shuffle" else 0,
+            commission_pct=config["commission"],
+            blackjack_payout=float(config["blackjack_payout"].split(":")[0]),
             num_players=config.get("num_players", 1),
             player_hit_rules=hit_rules_dict if hit_rules_dict else None
         )
@@ -261,13 +442,13 @@ with tab1:
         simulation_time = end_time - start_time
         
         # Generate reports
-        report_generator = ReportGenerator(results, sim_config)
+        report_generator = StreamlitReportGenerator(results, sim_config)
         
         if config["save_results"]:
             os.makedirs("results", exist_ok=True)
-            report_generator.generate_detailed_csv(f"results/blackjack_sim_detailed_{timestamp}.csv")
-            report_generator.generate_matrix_csv(f"results/blackjack_sim_matrix_{timestamp}.csv")
-            report_generator.generate_summary(f"results/blackjack_sim_summary_{timestamp}.txt")
+            report_generator.generate_detailed_csv(f"blackjack_sim_detailed_{timestamp}.csv")
+            report_generator.generate_matrix_csv(f"blackjack_sim_matrix_{timestamp}.csv")
+            report_generator.generate_summary(f"blackjack_sim_summary_{timestamp}.txt")
         
         # Calculate metrics from results
         total_hands = results['total_bets']

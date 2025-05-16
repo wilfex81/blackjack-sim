@@ -61,3 +61,32 @@ class SimulationConfig:
                 f"  Blackjack payout: {self.blackjack_payout}:1\n"
                 f"  Players: {self.num_players}\n"
                 f"  Hit rules: {hit_rules_str}")
+                
+    def to_dict(self):
+        """
+        Convert configuration to a dictionary for serialization.
+        
+        Returns:
+            dict: Dictionary representation of configuration
+        """
+        # Create a serializable version of hit rules
+        serializable_hit_rules = {}
+        for key, value in self.player_hit_rules.items():
+            # Convert tuple keys to strings for JSON serialization
+            if isinstance(key, tuple):
+                serializable_hit_rules[str(key)] = value
+            else:
+                serializable_hit_rules[key] = value
+                
+        return {
+            'num_hands': self.num_hands,
+            'num_decks': self.num_decks,
+            'player_hit_soft_17': self.player_hit_soft_17,
+            'dealer_hit_soft_17': self.dealer_hit_soft_17,
+            'reshuffle_cutoff': self.reshuffle_cutoff,
+            'commission_pct': self.commission_pct,
+            'blackjack_payout': self.blackjack_payout,
+            'num_players': self.num_players,
+            'player_hit_rules': serializable_hit_rules,
+            'shuffle_type': "Continuous shuffle" if self.reshuffle_cutoff == 0 else f"Reshuffle at {self.reshuffle_cutoff} cards"
+        }
