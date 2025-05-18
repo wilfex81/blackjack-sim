@@ -29,7 +29,6 @@ def parse_hit_rules(rules_str):
         
     hit_rules = {}
     
-    # Split rules by semicolon
     rule_parts = rules_str.strip().split(';')
     
     for rule in rule_parts:

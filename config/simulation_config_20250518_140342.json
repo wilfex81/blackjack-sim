@@ -1,0 +1,12 @@
+{
+    "num_hands": 1000000,
+    "num_decks": 6,
+    "player_hit_soft_17": false,
+    "dealer_hit_soft_17": false,
+    "reshuffle_cutoff": 52,
+    "commission_pct": 5.0,
+    "blackjack_payout": 1.0,
+    "num_players": 1,
+    "player_hit_rules": {},
+    "shuffle_type": "Reshuffle at 52 cards"
+}

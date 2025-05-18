@@ -27,13 +27,13 @@ class BlackjackSimulator:
         """
         Set up the simulator with fresh shoe and strategies.
         """
-        # Create the shoe
+        # shoe
         self.shoe = Shoe(
             num_decks=self.config.num_decks,
             reshuffle_cutoff=self.config.reshuffle_cutoff
         )
         
-        # Create the strategies
+        #strategies
         self.dealer_strategy = DealerStrategy(
             hit_soft_17=self.config.dealer_hit_soft_17
         )
@@ -44,7 +44,7 @@ class BlackjackSimulator:
             hit_rules=self.config.player_hit_rules
         )
         
-        # Initialize results tracking
+        # Results tracking
         self.results = {
             'player_wins': 0,
             'dealer_wins': 0,
@@ -170,7 +170,7 @@ class BlackjackSimulator:
             self.results['outcome_matrix'][outcome_key] = 0
         self.results['outcome_matrix'][outcome_key] += 1
         
-        # Track detailed outcomes
+        # Detailed outcomes
         detail_key = (player_key, dealer_key, result)
         if detail_key not in self.results['outcome_details']:
             self.results['outcome_details'][detail_key] = 0

@@ -4,7 +4,7 @@ class SimulationConfig:
     """
     
     def __init__(self, 
-                 num_hands=1000000,
+                 num_hands=100000000,
                  num_decks=6,
                  player_hit_soft_17=False,
                  dealer_hit_soft_17=False,
@@ -69,10 +69,8 @@ class SimulationConfig:
         Returns:
             dict: Dictionary representation of configuration
         """
-        # Create a serializable version of hit rules
         serializable_hit_rules = {}
         for key, value in self.player_hit_rules.items():
-            # Convert tuple keys to strings for JSON serialization
             if isinstance(key, tuple):
                 serializable_hit_rules[str(key)] = value
             else:

@@ -29,7 +29,7 @@ This blackjack simulator allows for precise calculation of house edge by simulat
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/blackjack-sim.git
+git clone (github url/blackjack-sim)
 cd blackjack-sim
 ```
 
@@ -119,7 +119,6 @@ blackjack-sim/
 │   ├── reporting/       # Reporting tools
 │   │   └── report_generator.py
 │   └── main.py          # Main entry point
-└── tests/               # Unit tests
 ```
 
 ## Customizable Variant Rules
@@ -131,7 +130,3 @@ The simulator is set up for a custom variant where:
 3. If player and dealer both bust, the hand pushes
 4. If player and dealer both get blackjack, the hand pushes
 5. A 5% commission is taken from player wins (configurable)
-
-## License
-
-Free for personal and academic use.

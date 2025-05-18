@@ -35,7 +35,7 @@ class PlayerStrategy(BaseStrategy):
         """
         hand_value = player_hand.get_value()
         
-        # Check if we have specific rules for this scenario
+        # Check for specific rules for this scenario
         if dealer_up_card and self.hit_rules:
             dealer_value = dealer_up_card.get_value()
             

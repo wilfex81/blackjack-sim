@@ -9,14 +9,13 @@ import time
 import csv
 from datetime import datetime
 
-# Add the project root to the path so we can use absolute imports
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from src.simulation.config import SimulationConfig
 from src.simulation.simulator import BlackjackSimulator
+from src.simulation.interactive_simulator import InteractiveSimulator
 from src.reporting.report_generator import ReportGenerator
 
-# Custom ReportGenerator for the Streamlit app
 class StreamlitReportGenerator:
     """
     Streamlit-specific version of ReportGenerator that works with direct results
@@ -39,20 +38,17 @@ class StreamlitReportGenerator:
         """Generate a summary report of the results"""
         if not self.results:
             raise ValueError("No simulation results available to report")
-            
-        # Create results directory if it doesn't exist
+
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
             
         filepath = os.path.join(self.results_dir, filename)
-        
-        # Calculate percentages
+
         total_hands = self.results['total_bets']
         player_win_pct = 100 * self.results['player_wins'] / total_hands if total_hands > 0 else 0
         dealer_win_pct = 100 * self.results['dealer_wins'] / total_hands if total_hands > 0 else 0
         push_pct = 100 * self.results['pushes'] / total_hands if total_hands > 0 else 0
         
-        # Format summary text
         summary = [
             f"Simulation Results Summary",
             f"=========================",
@@ -71,8 +67,7 @@ class StreamlitReportGenerator:
             f"",
             f"House edge: {self.results['house_edge']:.4f}%"
         ]
-        
-        # Write to file
+
         with open(filepath, 'w') as f:
             f.write("\n".join(summary))
             
@@ -83,8 +78,7 @@ class StreamlitReportGenerator:
         """Generate a CSV file with the outcome matrix data"""
         if not self.results:
             raise ValueError("No simulation results available to report")
-            
-        # Create results directory if it doesn't exist
+
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
             
@@ -110,15 +104,12 @@ class StreamlitReportGenerator:
             if player_total <= max_player and dealer_total <= max_dealer:
                 matrix[player_total][dealer_total] = count
                 
-        # Write matrix to CSV file
         with open(filepath, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             
-            # Write header row with dealer totals
             header = ['Player\\Dealer'] + list(range(max_dealer + 1))
             writer.writerow(header)
             
-            # Write each player total row
             for player_total in range(max_player + 1):
                 row = [player_total] + matrix[player_total]
                 writer.writerow(row)
@@ -131,16 +122,14 @@ class StreamlitReportGenerator:
         if not self.results:
             raise ValueError("No simulation results available to report")
             
-        # Create results directory if it doesn't exist
+
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
             
         filepath = os.path.join(self.results_dir, filename)
         
-        # Get results details
         outcome_details = self.results['outcome_details']
         
-        # Prepare data for CSV
         detailed_data = []
         for (player_total, dealer_total, result), count in outcome_details.items():
             win_loss = "Win" if result == "player_win" else ("Loss" if result == "dealer_win" else "Push")
@@ -154,10 +143,8 @@ class StreamlitReportGenerator:
             }
             detailed_data.append(entry)
             
-        # Sort by player total, then dealer total
         detailed_data.sort(key=lambda x: (x['player_total'], x['dealer_total'], x['result']))
         
-        # Write to CSV
         with open(filepath, 'w', newline='') as csvfile:
             fieldnames = ['player_total', 'dealer_total', 'result', 'count', 'percentage']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -174,30 +161,23 @@ class StreamlitReportGenerator:
         if not self.results:
             raise ValueError("No simulation results available to report")
             
-        # Get results details
         outcome_details = self.results['outcome_details']
         
-        # Prepare data for DataFrame
         detailed_data = []
         
-        # Add all player vs dealer outcomes
         for (player_total, dealer_total, result), count in outcome_details.items():
             win_loss = "Win" if result == "player_win" else ("Loss" if result == "dealer_win" else "Push")
             
-            # Create multiple rows for each outcome (one per hand)
             for _ in range(count):
                 detailed_data.append({
                     'player_total': player_total,
                     'dealer_total': dealer_total,
                     'result': win_loss,
-                    'dealer_upcard': 0  # Placeholder
+                    'dealer_upcard': 0 
                 })
-        
-        # Create the DataFrame
-        import pandas as pd
+    
         return pd.DataFrame(detailed_data)
 
-# Set page configuration
 st.set_page_config(
     page_title="Blackjack Simulator",
     page_icon="🃏",
@@ -205,7 +185,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -237,7 +216,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Title and introduction
 st.markdown('<div class="main-header">Blackjack Simulator</div>', unsafe_allow_html=True)
 st.markdown("""
 This application allows you to configure and run blackjack simulations to analyze house edge 
@@ -245,7 +223,6 @@ and game dynamics under various rule configurations. You can adjust parameters,
 run simulations, and visualize the results.
 """)
 
-# Load existing configs and results for use in the app
 def load_configs():
     """Load all saved configurations from the config directory"""
     configs = []
@@ -266,7 +243,6 @@ def load_simulation_results():
     try:
         results_dir = "results"
         if os.path.exists(results_dir):
-            # Look for summary text files
             for filename in os.listdir(results_dir):
                 if filename.startswith('blackjack_sim_summary_') and filename.endswith('.txt'):
                     timestamp = filename.replace('blackjack_sim_summary_', '').replace('.txt', '')
@@ -285,18 +261,14 @@ def load_simulation_results():
     except Exception as e:
         st.error(f"Error loading simulation results: {e}")
     
-    # Sort results by timestamp (newest first)
     results.sort(key=lambda x: x['timestamp'], reverse=True)
     return results
 
-# Main navigation - using tabs
-tab1, tab2, tab3 = st.tabs(["Run Simulation", "Data Visualization", "Previous Results"])
+tab1, tab2, tab3, tab4 = st.tabs(["Run Simulation", "Hand-by-Hand Simulation", "Data Visualization", "Previous Results"])
 
-# Run Simulation Tab
 with tab1:
     st.markdown('<div class="section-header">Configure and Run Simulation</div>', unsafe_allow_html=True)
     
-    # Configuration form with all advanced options
     with st.form("simulation_config_advanced"):
         col1, col2 = st.columns(2)
         
@@ -366,7 +338,6 @@ with tab1:
             save_results = st.checkbox("Save Simulation Results", value=True)
             generate_visuals = st.checkbox("Generate Visualizations", value=True)
         
-        # Advanced Strategy Options
         advanced_expander = st.expander("Advanced Strategy Options")
         with advanced_expander:
             custom_hit_rules = st.text_area(
@@ -377,11 +348,9 @@ with tab1:
         
         submit_button = st.form_submit_button("Run Simulation")
 
-    # Function to run the simulation with all advanced options
     def run_simulation_advanced(config):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Parse custom hit rules if provided
         hit_rules_dict = {}
         if config.get("custom_hit_rules"):
             try:
@@ -414,7 +383,6 @@ with tab1:
             except Exception as e:
                 st.warning(f"Error parsing custom hit rules: {e}. Default rules will be used.")
         
-        # Create configuration object with all advanced parameters
         sim_config = SimulationConfig(
             num_decks=config["num_decks"],
             num_hands=config["num_hands"],
@@ -427,21 +395,18 @@ with tab1:
             player_hit_rules=hit_rules_dict if hit_rules_dict else None
         )
         
-        # Save config
         if config["save_results"]:
             os.makedirs("config", exist_ok=True)
             config_file = f"config/simulation_config_{timestamp}.json"
             with open(config_file, "w") as f:
                 json.dump(sim_config.to_dict(), f, indent=4)
         
-        # Create and run simulator
         simulator = BlackjackSimulator(sim_config)
         start_time = time.time()
         results = simulator.run_simulation()
         end_time = time.time()
         simulation_time = end_time - start_time
         
-        # Generate reports
         report_generator = StreamlitReportGenerator(results, sim_config)
         
         if config["save_results"]:
@@ -450,7 +415,6 @@ with tab1:
             report_generator.generate_matrix_csv(f"blackjack_sim_matrix_{timestamp}.csv")
             report_generator.generate_summary(f"blackjack_sim_summary_{timestamp}.txt")
         
-        # Calculate metrics from results
         total_hands = results['total_bets']
         player_win_rate = results['player_wins'] / total_hands if total_hands > 0 else 0
         dealer_win_rate = results['dealer_wins'] / total_hands if total_hands > 0 else 0
@@ -459,7 +423,6 @@ with tab1:
         dealer_bust_rate = results['dealer_busts'] / total_hands if total_hands > 0 else 0
         house_edge = results['house_edge']
         
-        # Return summary data
         summary_data = {
             "timestamp": timestamp,
             "config": sim_config.to_dict(),
@@ -473,14 +436,12 @@ with tab1:
             "dealer_bust_rate": dealer_bust_rate
         }
         
-        # If generating visuals, create DataFrames for plotting
         if config["generate_visuals"]:
             detailed_results_df = report_generator.get_detailed_dataframe()
             summary_data["detailed_df"] = detailed_results_df
         
         return summary_data
 
-    # Handle simulation when form is submitted
     if submit_button:
         with st.spinner('Running simulation... This may take a moment.'):
             config = {
@@ -503,7 +464,6 @@ with tab1:
             
         st.success(f"Simulation completed! {num_hands} hands simulated in {simulation_results['simulation_time']:.2f} seconds.")
 
-        # Display immediate results after simulation
         results = simulation_results
         
         st.markdown('<div class="section-header">Simulation Results</div>', unsafe_allow_html=True)
@@ -549,14 +509,508 @@ with tab1:
             - Summary: `results/blackjack_sim_summary_{results['timestamp']}.txt`
             """)
 
-# Data Visualization tab - Enhanced with more advanced visualization options
 with tab2:
+    st.markdown('<div class="section-header">Interactive Hand-by-Hand Simulation</div>', unsafe_allow_html=True)
+    st.markdown("""
+    This mode allows you to see each hand being played step-by-step and observe how the 
+    statistics evolve in real-time as more hands are played.
+    """)
+    
+    st.markdown("""
+    <style>
+        .card {
+            display: inline-block;
+            width: 70px;
+            height: 100px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            margin: 5px;
+            text-align: center;
+            font-size: 24px;
+            line-height: 100px;
+            font-weight: bold;
+        }
+        .card.spades, .card.clubs {
+            color: #222;
+        }
+        .card.hearts, .card.diamonds {
+            color: #D22;
+        }
+        .card-hand {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #1E5631;
+            border-radius: 8px;
+            display: inline-block;
+            min-width: 300px;
+        }
+        .hand-value {
+            color: white;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .hand-label {
+            font-weight: bold;
+            color: white;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        .result-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .result-win {
+            background-color: #10B981;
+            color: white;
+        }
+        .result-loss {
+            background-color: #EF4444;
+            color: white;
+        }
+        .result-push {
+            background-color: #F59E0B;
+            color: white;
+        }
+        .stats-box {
+            background-color: #EEF2FF;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .step-btn {
+            min-width: 120px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    if "interactive_simulator" not in st.session_state:
+        st.session_state.interactive_simulator = None
+        st.session_state.current_state = None
+    
+    with st.expander("Configuration", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            num_decks = st.number_input(
+                "Number of Decks", 
+                min_value=1, 
+                max_value=8, 
+                value=6,
+                key="interactive_num_decks"
+            )
+            
+            player_hits_soft_17 = st.checkbox(
+                "Player Hits Soft 17", 
+                value=False,
+                key="interactive_player_hits_soft_17"
+            )
+            
+            shuffle_method = st.selectbox(
+                "Shuffle Method",
+                options=["Reshuffle at threshold", "Continuous shuffle"],
+                index=0,
+                key="interactive_shuffle_method"
+            )
+            
+            if shuffle_method == "Reshuffle at threshold":
+                reshuffle_threshold = st.number_input(
+                    "Reshuffle Threshold (cards remaining)", 
+                    min_value=0, 
+                    max_value=104, 
+                    value=52,
+                    key="interactive_reshuffle_threshold"
+                )
+            else:
+                reshuffle_threshold = 0
+                
+        with col2:
+            dealer_hits_soft_17 = st.checkbox(
+                "Dealer Hits Soft 17", 
+                value=False,
+                key="interactive_dealer_hits_soft_17"
+            )
+            
+            commission = st.slider(
+                "Commission (%)", 
+                min_value=0.0, 
+                max_value=10.0, 
+                value=5.0, 
+                step=0.1,
+                key="interactive_commission"
+            )
+            
+            blackjack_payout = st.selectbox(
+                "Blackjack Payout",
+                options=["1:1", "3:2", "2:1"],
+                index=0,
+                key="interactive_blackjack_payout"
+            )
+        
+            st.markdown("### Advanced Strategy Options")
+            custom_hit_rules = st.text_area(
+                "Custom Hit Rules", 
+                value="",
+                help="Format: 'hard:16,10:hit;soft:17:hit' means hit on hard 16 when dealer shows 10, and hit on soft 17",
+                key="interactive_custom_hit_rules"
+            )
+            
+        initialize_button = st.button("Initialize Simulator", use_container_width=True)
+        
+        if initialize_button:
+            hit_rules_dict = {}
+            if custom_hit_rules:
+                try:
+                    for rule in custom_hit_rules.split(';'):
+                        if not rule:
+                            continue
+                        components = rule.strip().split(':')
+                        if len(components) < 3:
+                            st.warning(f"Skipping invalid rule format: {rule}")
+                            continue
+                        
+                        hand_type = components[0].lower()  # "hard" or "soft"
+                        total = components[1]  # player total
+                        dealer_cards_action = components[2]  # dealer cards and action
+                        
+                        if ',' in dealer_cards_action:
+                            dealer_card_str, action = dealer_cards_action.split(',')
+                            dealer_cards = [int(c) for c in dealer_card_str.split('|')]
+                        else:
+                            dealer_cards = list(range(2, 12))  # All possible dealer cards
+                            action = dealer_cards_action
+                        
+                        should_hit = action.lower() in ('hit', 'h', 'true', 't', 'yes', 'y', '1')
+                        
+                        for dealer_card in dealer_cards:
+                            if hand_type == 'hard':
+                                hit_rules_dict[(int(total), dealer_card)] = should_hit
+                            else:
+                                hit_rules_dict[(f"soft {total}", dealer_card)] = should_hit
+                except Exception as e:
+                    st.warning(f"Error parsing custom hit rules: {e}. Default rules will be used.")
+            
+            sim_config = SimulationConfig(
+                num_decks=num_decks,
+                num_hands=100000000,
+                player_hit_soft_17=player_hits_soft_17,
+                dealer_hit_soft_17=dealer_hits_soft_17,  
+                reshuffle_cutoff=reshuffle_threshold if shuffle_method != "Continuous shuffle" else 0,
+                commission_pct=commission,
+                blackjack_payout=float(blackjack_payout.split(":")[0]),
+                num_players=1,
+                player_hit_rules=hit_rules_dict if hit_rules_dict else None
+            )
+            
+            st.session_state.interactive_simulator = InteractiveSimulator(sim_config)
+            st.session_state.interactive_simulator.setup()
+            
+            st.session_state.current_state = st.session_state.interactive_simulator.start_new_hand()
+            st.rerun()
+
+    if st.session_state.interactive_simulator is not None and st.session_state.current_state is not None:
+        st.markdown("### Simulation Controls")
+        
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            if st.session_state.current_state["phase"] == "init":
+                deal_button = st.button("Deal New Hand", key="deal_btn", use_container_width=True, type="primary")
+                if deal_button:
+                    st.session_state.current_state = st.session_state.interactive_simulator.deal_cards()
+                    st.rerun()
+            elif st.session_state.current_state["phase"] == "player_turn":
+                hit_button = st.button("Hit", key="hit_btn", use_container_width=True)
+                if hit_button:
+                    st.session_state.current_state = st.session_state.interactive_simulator.player_hit()
+                    st.rerun()
+        
+        with col2:
+            if st.session_state.current_state["phase"] == "player_turn":
+                stand_button = st.button("Stand", key="stand_btn", use_container_width=True)
+                if stand_button:
+                    st.session_state.current_state = st.session_state.interactive_simulator.player_stand()
+                    st.rerun()
+            elif st.session_state.current_state["phase"] == "dealer_turn":
+                step_button = st.button("Dealer Step", key="step_btn", use_container_width=True)
+                if step_button:
+                    st.session_state.current_state = st.session_state.interactive_simulator.dealer_step()
+                    st.rerun()
+            elif st.session_state.current_state["phase"] == "result":
+                next_hand_button = st.button("Next Hand", key="next_hand_btn", use_container_width=True, type="primary")
+                if next_hand_button:
+                    st.session_state.current_state = st.session_state.interactive_simulator.start_new_hand()
+                    st.rerun()
+                    
+        with col3:
+            st.info(f"Current Phase: {st.session_state.current_state['phase'].replace('_', ' ').title()}")
+        
+        st.markdown("### Current Hand")
+        
+        def render_card(card_str):
+            if not card_str:
+                return ""
+                
+            parts = card_str.split(" of ")
+            if len(parts) != 2:
+                return card_str
+                
+            rank, suit = parts
+            
+            suit_class = suit.lower()
+            rank_display = rank
+            if rank == "10":
+                rank_display = "10"
+            elif rank == "Jack":
+                rank_display = "J"
+            elif rank == "Queen":
+                rank_display = "Q"
+            elif rank == "King":
+                rank_display = "K"
+            elif rank == "Ace":
+                rank_display = "A"
+                
+            return f'<div class="card {suit_class}">{rank_display}</div>'
+        
+        def render_hand(hand_data, is_dealer=False, hide_second_card=False):
+            html = '<div class="card-hand">'
+            
+            if is_dealer:
+                html += '<div class="hand-label">Dealer Hand</div>'
+            else:
+                html += '<div class="hand-label">Player Hand</div>'
+            
+            if is_dealer and hide_second_card:
+                html += '<div class="hand-value">Value: ?</div>'
+            else:
+                value = hand_data["value"]
+                soft_text = " (soft)" if hand_data["is_soft"] else ""
+                html += f'<div class="hand-value">Value: {value}{soft_text}</div>'
+            
+            for i, card_str in enumerate(hand_data["cards"]):
+                if is_dealer and i == 1 and hide_second_card:
+                    html += '<div class="card" style="background-color: #6B7280; color: white;">?</div>'
+                else:
+                    html += render_card(card_str)
+            
+            html += '</div>'
+            return html
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.session_state.current_state["player_hands"]:
+                player_hand = st.session_state.current_state["player_hands"][0]
+                st.markdown(render_hand(player_hand), unsafe_allow_html=True)
+                
+                if player_hand["is_bust"]:
+                    st.error("Player Bust!")
+                elif player_hand["is_blackjack"]:
+                    st.success("Player Blackjack!")
+        
+        with col2:
+            if st.session_state.current_state["dealer_hand"]:
+                dealer_hand = st.session_state.current_state["dealer_hand"]
+                hide_hole_card = st.session_state.current_state["phase"] in ["init", "player_turn"]
+                
+                st.markdown(
+                    render_hand(dealer_hand, is_dealer=True, hide_second_card=hide_hole_card),
+                    unsafe_allow_html=True
+                )
+                
+                if st.session_state.current_state["phase"] == "result":
+                    if dealer_hand["is_bust"]:
+                        st.error("Dealer Bust!")
+                    elif dealer_hand["is_blackjack"]:
+                        st.success("Dealer Blackjack!")
+        
+        if st.session_state.current_state["result"]:
+            result = st.session_state.current_state["result"]
+            
+            if "display_result" in result:
+                if result["display_result"] == "Player Win":
+                    st.markdown('<div class="result-badge result-win">Player Win</div>', unsafe_allow_html=True)
+                    st.markdown("*You bet on the dealer — your bet was correct. Dealer won.*")
+                elif result["display_result"] == "Dealer Win":
+                    st.markdown('<div class="result-badge result-loss">Dealer Win</div>', unsafe_allow_html=True)
+                    st.markdown("*You bet on the dealer — your bet was incorrect. Dealer lost.*")
+                else: 
+                    st.markdown('<div class="result-badge result-push">Push</div>', unsafe_allow_html=True)
+                    st.markdown("*You bet on the dealer — the result was a tie.*")
+            else:
+                if result["result"] == "player_win":
+                    st.markdown('<div class="result-badge result-win">Player Win</div>', unsafe_allow_html=True)
+                    st.markdown("*You bet on the dealer — your bet was correct. Dealer won.*")
+                elif result["result"] == "dealer_win":
+                    st.markdown('<div class="result-badge result-loss">Dealer Win</div>', unsafe_allow_html=True)
+                    st.markdown("*You bet on the dealer — your bet was incorrect. Dealer lost.*")
+                else:  # push
+                    st.markdown('<div class="result-badge result-push">Push</div>', unsafe_allow_html=True)
+                    st.markdown("*You bet on the dealer — the result was a tie.*")
+                
+            st.write(f"Final: Player: {result['player_value']} vs Dealer: {result['dealer_value']}")
+        
+        st.markdown("### Real-time Statistics")
+        
+        stats = st.session_state.current_state["stats"]
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("Hands Played", stats["total_hands"])
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("House Edge", f"{stats['house_edge']:.4f}%")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("Player Wins", f"{stats['player_wins']} ({100*stats['player_wins']/max(stats['total_hands'],1):.1f}%)")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("Player Busts", f"{stats['player_busts']} ({100*stats['player_busts']/max(stats['total_hands'],1):.1f}%)")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("Dealer Wins", f"{stats['dealer_wins']} ({100*stats['dealer_wins']/max(stats['total_hands'],1):.1f}%)")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("Dealer Busts", f"{stats['dealer_busts']} ({100*stats['dealer_busts']/max(stats['total_hands'],1):.1f}%)")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+        st.metric("Pushes", f"{stats['pushes']} ({100*stats['pushes']/max(stats['total_hands'],1):.1f}%)")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        if st.session_state.current_state["history_length"] > 0:
+            with st.expander("Hand History", expanded=False):
+                history = st.session_state.interactive_simulator.get_hand_history()
+                history_df = pd.DataFrame(history)
+                
+                history_df["player_cards"] = history_df["player_hand"].apply(lambda x: ", ".join(x))
+                history_df["dealer_cards"] = history_df["dealer_hand"].apply(lambda x: ", ".join(x))
+                
+                history_df["outcome"] = history_df["result"].map({
+                    "player_win": "Player Win", 
+                    "dealer_win": "Dealer Win",
+                    "push": "Push"
+                })
+                
+                display_df = history_df[["player_value", "dealer_value", "outcome", "player_cards", "dealer_cards"]]
+                display_df.index = display_df.index + 1  # 1-based indexing for hand number
+                
+                st.dataframe(display_df.iloc[::-1])
+        
+        # Auto-play option
+        with st.expander("Auto-play Options", expanded=False):
+            st.write("Set up auto-play to automatically simulate multiple hands in succession.")
+            
+            num_auto_hands = st.number_input(
+                "Number of Hands to Auto-Play", 
+                min_value=1,
+                max_value=100,
+                value=10
+            )
+            
+            delay = st.slider(
+                "Delay Between Steps (seconds)",
+                min_value=0.1,
+                max_value=2.0,
+                value=0.5,
+                step=0.1
+            )
+            
+            auto_play = st.button("Start Auto-Play", key="auto_play_btn")
+            
+            if auto_play:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                for i in range(num_auto_hands):
+                    # Start a new hand
+                    st.session_state.current_state = st.session_state.interactive_simulator.start_new_hand()
+                    status_text.text(f"Hand {i+1}/{num_auto_hands}: Dealing cards...")
+                    time.sleep(delay)
+                    
+                    # Deal cards
+                    st.session_state.current_state = st.session_state.interactive_simulator.deal_cards()
+                    
+                    # If not in player_turn phase, the hand might already be complete (blackjack)
+                    if st.session_state.current_state["phase"] == "player_turn":
+                        status_text.text(f"Hand {i+1}/{num_auto_hands}: Player's turn...")
+                        time.sleep(delay)
+                        
+                        # Play player's hand
+                        while st.session_state.current_state["phase"] == "player_turn":
+                            st.session_state.current_state = st.session_state.interactive_simulator.player_hit()
+                            time.sleep(delay/2)
+                    
+                    # If needed, play dealer's hand
+                    if st.session_state.current_state["phase"] == "dealer_turn":
+                        status_text.text(f"Hand {i+1}/{num_auto_hands}: Dealer's turn...")
+                        time.sleep(delay)
+                        
+                        while st.session_state.current_state["phase"] == "dealer_turn":
+                            st.session_state.current_state = st.session_state.interactive_simulator.dealer_step()
+                            time.sleep(delay/2)
+                    
+                    # Show result
+                    status_text.text(f"Hand {i+1}/{num_auto_hands}: Complete!")
+                    time.sleep(delay)
+                    
+                    # Update progress bar
+                    progress_bar.progress((i + 1) / num_auto_hands)
+                
+                status_text.text(f"Auto-play complete! {num_auto_hands} hands played.")
+                st.rerun()
+    else:
+        st.info("Initialize the simulator to begin playing hands interactively.")
+        
+    # Add documentation about the custom variant
+    with st.expander("About This Blackjack Variant", expanded=False):
+        st.markdown("""
+        ### Custom Blackjack Variant Rules
+        
+        This simulator implements a custom variant of blackjack where:
+        
+        1. The player bets on the dealer's hand winning against their own hand
+        2. The player hits using the same rules as the dealer by default (unless custom hit rules are specified)
+        3. If player and dealer both bust, the hand pushes
+        4. If player and dealer both get blackjack, the hand pushes
+        5. A commission is taken from player wins (configurable %)
+        
+        ### How to Use the Hand-by-Hand Simulator
+        
+        1. Configure your game settings and click "Initialize Simulator"
+        2. Use the "Deal New Hand" button to start a new hand
+        3. During the player's turn, use "Hit" to take another card or "Stand" to end your turn
+        4. During the dealer's turn, use "Dealer Step" to deal one card at a time to the dealer
+        5. After the hand is complete, view the result and statistics, then click "Next Hand" to continue
+        6. The "Auto-play" option allows you to simulate multiple hands automatically
+        
+        ### Understanding the Statistics
+        
+        The real-time statistics show:
+        - House Edge: The mathematical advantage the house has over the player
+        - Win/Loss/Push rates: The percentage of hands that result in each outcome
+        - Bust rates: How often the player and dealer bust their hands
+        
+        These statistics become more accurate as more hands are played.
+        """)
+
+with tab3:
     st.markdown('<div class="section-header">Data Visualization</div>', unsafe_allow_html=True)
     
     if "latest_results" in st.session_state and st.session_state.latest_results.get("detailed_df") is not None:
         detailed_df = st.session_state.latest_results["detailed_df"]
         
-        # Advanced visualization options
         st.markdown("### Select Visualization Type")
         viz_options = [
             "Hand Outcomes", 
@@ -581,7 +1035,6 @@ with tab2:
             
             st.pyplot(fig)
             
-            # Show outcome percentages
             st.dataframe(
                 outcomes.assign(Percentage=lambda x: (x["Count"] / x["Count"].sum() * 100).round(2)).assign(
                     Percentage=lambda x: x["Percentage"].astype(str) + '%'
@@ -591,12 +1044,10 @@ with tab2:
         elif viz_type == "Total Value Distribution":
             fig, ax = plt.subplots(1, 2, figsize=(15, 6))
             
-            # Player totals
             sns.histplot(detailed_df["player_total"], kde=True, bins=20, ax=ax[0])
             ax[0].set_title("Player Hand Total Distribution")
             ax[0].set_xlabel("Player Hand Total")
             
-            # Dealer totals
             sns.histplot(detailed_df["dealer_total"], kde=True, bins=20, ax=ax[1])
             ax[1].set_title("Dealer Hand Total Distribution")
             ax[1].set_xlabel("Dealer Hand Total")
@@ -607,18 +1058,15 @@ with tab2:
         elif viz_type == "Win/Loss by Player Total":
             fig, ax = plt.subplots(figsize=(12, 7))
             
-            # Create a pivot table of outcomes by player total
             pivot_data = detailed_df.pivot_table(
                 index="player_total", 
                 columns="result", 
                 aggfunc="size", 
                 fill_value=0
             )
-            
-            # Convert to percentages
+
             pivot_pct = pivot_data.div(pivot_data.sum(axis=1), axis=0) * 100
             
-            # Plot stacked bar chart
             pivot_pct.plot(kind="bar", stacked=True, ax=ax, colormap="viridis")
             ax.set_title("Outcome by Player Total")
             ax.set_xlabel("Player Hand Total")
@@ -631,22 +1079,18 @@ with tab2:
         elif viz_type == "Dealer Bust Analysis":
             fig, ax = plt.subplots(figsize=(10, 6))
             
-            # Filter for dealer busts
             dealer_busts = detailed_df[detailed_df["dealer_total"] > 21]
             
             if len(dealer_busts) > 0:
                 bust_by_upcard = dealer_busts.groupby("dealer_upcard").size().reset_index()
                 bust_by_upcard.columns = ["Dealer Upcard", "Bust Count"]
                 
-                # Calculate total hands for each upcard
                 total_by_upcard = detailed_df.groupby("dealer_upcard").size().reset_index()
                 total_by_upcard.columns = ["Dealer Upcard", "Total Count"]
                 
-                # Merge and calculate percentages
                 bust_analysis = pd.merge(bust_by_upcard, total_by_upcard, on="Dealer Upcard")
                 bust_analysis["Bust Percentage"] = (bust_analysis["Bust Count"] / bust_analysis["Total Count"] * 100).round(2)
                 
-                # Plot
                 sns.barplot(x="Dealer Upcard", y="Bust Percentage", data=bust_analysis, palette="viridis", ax=ax)
                 ax.set_title("Dealer Bust Percentage by Upcard")
                 ax.set_ylabel("Bust Percentage (%)")
@@ -654,13 +1098,11 @@ with tab2:
                 plt.tight_layout()
                 st.pyplot(fig)
                 
-                # Show the raw data
                 st.dataframe(bust_analysis)
             else:
                 st.info("No dealer busts found in this simulation.")
         
         elif viz_type == "Outcome Matrix Heatmap":
-            # Create matrix for heatmap
             matrix_df = pd.crosstab(
                 detailed_df["player_total"], 
                 detailed_df["dealer_total"], 
@@ -684,7 +1126,6 @@ with tab2:
             plt.tight_layout()
             st.pyplot(fig)
             
-            # Show frequency matrix
             st.write("##### Hand Total Frequency Matrix")
             freq_matrix = pd.crosstab(
                 detailed_df["player_total"], 
@@ -851,8 +1292,7 @@ with tab2:
         else:
             st.info("Run a simulation to see visualizations here.")
 
-# Previous Results tab - Enhanced with more options
-with tab3:
+with tab4:
     st.markdown('<div class="section-header">Previous Simulation Results</div>', unsafe_allow_html=True)
     
     # Get list of previous simulation files

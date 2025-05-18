@@ -31,21 +31,17 @@ class ReportGenerator:
         if not self.simulator.results:
             raise ValueError("No simulation results available to report")
             
-        # Create results directory if it doesn't exist
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
             
-        # Generate filename if not provided
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"blackjack_sim_summary_{timestamp}.txt"
             
         filepath = os.path.join(self.results_dir, filename)
         
-        # Get the summary text
         summary = self.simulator.get_results_summary()
         
-        # Write to file
         with open(filepath, 'w') as f:
             f.write(summary)
             
@@ -64,47 +60,38 @@ class ReportGenerator:
         """
         if not self.simulator.results:
             raise ValueError("No simulation results available to report")
-            
-        # Create results directory if it doesn't exist
+
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
-            
-        # Generate filename if not provided
+
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"blackjack_sim_matrix_{timestamp}.csv"
             
         filepath = os.path.join(self.results_dir, filename)
-        
-        # Create a 2D matrix from the outcome data
+
         outcome_matrix = self.simulator.results['outcome_matrix']
-        
-        # Find the maximum values to define matrix dimensions
+
         max_player = 21
         max_dealer = 21
         for player_total, dealer_total in outcome_matrix.keys():
             max_player = max(max_player, player_total)
             max_dealer = max(max_dealer, dealer_total)
             
-        # Initialize matrix with zeros
         matrix = []
         for _ in range(max_player + 1):
             matrix.append([0] * (max_dealer + 1))
             
-        # Fill in matrix values
         for (player_total, dealer_total), count in outcome_matrix.items():
             if player_total <= max_player and dealer_total <= max_dealer:
                 matrix[player_total][dealer_total] = count
                 
-        # Write matrix to CSV file
         with open(filepath, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            
-            # Write header row with dealer totals
+
             header = ['Player\\Dealer'] + list(range(max_dealer + 1))
             writer.writerow(header)
             
-            # Write each player total row
             for player_total in range(max_player + 1):
                 row = [player_total] + matrix[player_total]
                 writer.writerow(row)
@@ -125,21 +112,17 @@ class ReportGenerator:
         if not self.simulator.results:
             raise ValueError("No simulation results available to report")
             
-        # Create results directory if it doesn't exist
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
             
-        # Generate filename if not provided
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"blackjack_sim_detailed_{timestamp}.csv"
             
         filepath = os.path.join(self.results_dir, filename)
         
-        # Get results details
         outcome_details = self.simulator.results['outcome_details']
         
-        # Prepare data for CSV
         detailed_data = []
         for (player_total, dealer_total, result), count in outcome_details.items():
             win_loss = "Win" if result == "player_win" else ("Loss" if result == "dealer_win" else "Push")
@@ -153,10 +136,8 @@ class ReportGenerator:
             }
             detailed_data.append(entry)
             
-        # Sort by player total, then dealer total
         detailed_data.sort(key=lambda x: (x['player_total'], x['dealer_total'], x['result']))
         
-        # Write to CSV
         with open(filepath, 'w', newline='') as csvfile:
             fieldnames = ['player_total', 'dealer_total', 'result', 'count', 'percentage']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -180,19 +161,16 @@ class ReportGenerator:
         """
         config = self.simulator.config
         
-        # Create config directory if it doesn't exist
         config_dir = os.path.join(os.getcwd(), 'config')
         if not os.path.exists(config_dir):
             os.makedirs(config_dir)
-            
-        # Generate filename if not provided
+
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"simulation_config_{timestamp}.json"
             
         filepath = os.path.join(config_dir, filename)
         
-        # Create a JSON serializable config dictionary
         config_dict = {
             'num_hands': config.num_hands,
             'num_decks': config.num_decks,
@@ -202,10 +180,9 @@ class ReportGenerator:
             'commission_pct': config.commission_pct,
             'blackjack_payout': config.blackjack_payout,
             'num_players': config.num_players,
-            'player_hit_rules': str(config.player_hit_rules)  # Convert dict to string for JSON serialization
+            'player_hit_rules': str(config.player_hit_rules)
         }
         
-        # Write to file
         with open(filepath, 'w') as f:
             json.dump(config_dict, f, indent=4)
             
