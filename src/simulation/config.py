@@ -12,7 +12,8 @@ class SimulationConfig:
                  commission_pct=5.0,
                  blackjack_payout=1.0,
                  num_players=1,
-                 player_hit_rules=None):
+                 player_hit_rules=None,
+                 commission_on_blackjack=True):
         """
         Initialize simulation configuration.
         
@@ -26,6 +27,7 @@ class SimulationConfig:
             blackjack_payout (float): Payout ratio for blackjack
             num_players (int): Number of players at the table
             player_hit_rules (dict): Custom player hitting rules
+            commission_on_blackjack (bool): Whether commission is applied to blackjack wins
         """
         self.num_hands = num_hands
         self.num_decks = num_decks
@@ -36,6 +38,7 @@ class SimulationConfig:
         self.blackjack_payout = blackjack_payout
         self.num_players = num_players
         self.player_hit_rules = player_hit_rules or {}
+        self.commission_on_blackjack = commission_on_blackjack
         
     def get_commission_multiplier(self):
         """
@@ -58,6 +61,7 @@ class SimulationConfig:
                 f"  Dealer hit soft 17: {self.dealer_hit_soft_17}\n"
                 f"  Shuffle: {shuffle_type}\n"
                 f"  Commission: {self.commission_pct}%\n"
+                f"  Commission on blackjack: {self.commission_on_blackjack}\n"
                 f"  Blackjack payout: {self.blackjack_payout}:1\n"
                 f"  Players: {self.num_players}\n"
                 f"  Hit rules: {hit_rules_str}")
@@ -86,5 +90,6 @@ class SimulationConfig:
             'blackjack_payout': self.blackjack_payout,
             'num_players': self.num_players,
             'player_hit_rules': serializable_hit_rules,
+            'commission_on_blackjack': self.commission_on_blackjack,
             'shuffle_type': "Continuous shuffle" if self.reshuffle_cutoff == 0 else f"Reshuffle at {self.reshuffle_cutoff} cards"
         }

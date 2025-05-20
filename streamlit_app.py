@@ -65,7 +65,7 @@ class StreamlitReportGenerator:
             f"Player busts: {self.results['player_busts']} ({100 * self.results['player_busts'] / total_hands:.2f}%)",
             f"Dealer busts: {self.results['dealer_busts']} ({100 * self.results['dealer_busts'] / total_hands:.2f}%)",
             f"",
-            f"House edge: {self.results['house_edge']:.4f}%"
+            f"House edge: {self.results['house_edge']:.2f}%"
         ]
 
         with open(filepath, 'w') as f:
@@ -278,7 +278,7 @@ with tab1:
             num_hands = st.number_input(
                 "Number of Hands to Simulate", 
                 min_value=100, 
-                max_value=1000000, 
+                max_value=100000000, 
                 value=10000,
                 step=1000
             )
@@ -329,9 +329,11 @@ with tab1:
             
             blackjack_payout = st.selectbox(
                 "Blackjack Payout",
-                options=["1:1", "3:2", "2:1"],
+                options=["1:1", "6:5", "3:2", "2:1"],
                 index=0
             )
+            
+            commission_on_blackjack = st.checkbox("Apply Commission to Blackjack Wins", value=True)
             
             st.markdown("### Simulation Options")
             
@@ -392,7 +394,8 @@ with tab1:
             commission_pct=config["commission"],
             blackjack_payout=float(config["blackjack_payout"].split(":")[0]),
             num_players=config.get("num_players", 1),
-            player_hit_rules=hit_rules_dict if hit_rules_dict else None
+            player_hit_rules=hit_rules_dict if hit_rules_dict else None,
+            commission_on_blackjack=config["commission_on_blackjack"]
         )
         
         if config["save_results"]:
@@ -453,6 +456,7 @@ with tab1:
                 "reshuffle_threshold": reshuffle_threshold if shuffle_method == "Reshuffle at threshold" else 0,
                 "commission": commission,
                 "blackjack_payout": blackjack_payout,
+                "commission_on_blackjack": commission_on_blackjack,
                 "num_players": num_players,
                 "save_results": save_results,
                 "generate_visuals": generate_visuals,
@@ -645,11 +649,13 @@ with tab2:
             
             blackjack_payout = st.selectbox(
                 "Blackjack Payout",
-                options=["1:1", "3:2", "2:1"],
+                options=["1:1", "6:5", "3:2", "2:1"],
                 index=0,
                 key="interactive_blackjack_payout"
             )
-        
+            
+            commission_on_blackjack = st.checkbox("Apply Commission to Blackjack Wins", value=True, key="interactive_commission_on_blackjack")
+            
             st.markdown("### Advanced Strategy Options")
             custom_hit_rules = st.text_area(
                 "Custom Hit Rules", 
@@ -702,7 +708,8 @@ with tab2:
                 commission_pct=commission,
                 blackjack_payout=float(blackjack_payout.split(":")[0]),
                 num_players=1,
-                player_hit_rules=hit_rules_dict if hit_rules_dict else None
+                player_hit_rules=hit_rules_dict if hit_rules_dict else None,
+                commission_on_blackjack=commission_on_blackjack
             )
             
             st.session_state.interactive_simulator = InteractiveSimulator(sim_config)
@@ -864,7 +871,7 @@ with tab2:
             st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
-            st.metric("House Edge", f"{stats['house_edge']:.4f}%")
+            st.metric("House Edge", f"{stats['house_edge']:.2f}%")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:

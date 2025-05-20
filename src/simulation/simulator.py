@@ -93,6 +93,26 @@ class BlackjackSimulator:
             tuple: (result, player_final_value, dealer_final_value)
             where result is one of: "player_win", "dealer_win", "push"
         """
+        # Check for blackjack first - if either has blackjack, the hand ends immediately
+        player_blackjack = player_hand.is_blackjack()
+        dealer_blackjack = dealer_hand.is_blackjack()
+        
+        # If both have blackjack, it's a push
+        if player_blackjack and dealer_blackjack:
+            self.results['blackjacks'] += 1
+            return "push", 21, 21
+            
+        # If player has blackjack, player hand > dealer hand
+        if player_blackjack:
+            self.results['blackjacks'] += 1
+            return "dealer_win", 21, dealer_hand.get_value()  # In this variant, dealer wins means player loses
+            
+        # If dealer has blackjack, dealer hand > player hand
+        if dealer_blackjack:
+            self.results['blackjacks'] += 1
+            # Mark this as a dealer blackjack win for the payout calculation
+            return "player_win_blackjack", player_hand.get_value(), 21  # Special result code for blackjack payout
+        
         # Get the dealer's up card for strategy decisions
         dealer_up_card = dealer_hand.get_dealer_up_card()
         
@@ -139,15 +159,25 @@ class BlackjackSimulator:
         Update simulation statistics.
         
         Args:
-            result (str): Result of the hand ("player_win", "dealer_win", "push")
+            result (str): Result of the hand ("player_win", "dealer_win", "push", "player_win_blackjack")
             player_value (int): Final value of the player's hand
             dealer_value (int): Final value of the dealer's hand
         """
         # Update win/loss/push counts
-        if result == "player_win":
+        if result == "player_win" or result == "player_win_blackjack":
             self.results['player_wins'] += 1
-            # Apply commission to win amount
-            win_amount = self.config.get_commission_multiplier()
+            
+            if result == "player_win_blackjack":
+                # Apply blackjack payout for dealer blackjack
+                win_amount = self.config.blackjack_payout
+                
+                # Apply commission only if commission_on_blackjack is enabled
+                if self.config.commission_on_blackjack:
+                    win_amount *= self.config.get_commission_multiplier()
+            else:
+                # Regular win with commission
+                win_amount = self.config.get_commission_multiplier()
+                
             self.results['net_win_amount'] += win_amount
         elif result == "dealer_win":
             self.results['dealer_wins'] += 1
@@ -170,8 +200,9 @@ class BlackjackSimulator:
             self.results['outcome_matrix'][outcome_key] = 0
         self.results['outcome_matrix'][outcome_key] += 1
         
-        # Detailed outcomes
-        detail_key = (player_key, dealer_key, result)
+        # Detailed outcomes - standardize result for storage
+        result_for_storage = "player_win" if result == "player_win_blackjack" else result
+        detail_key = (player_key, dealer_key, result_for_storage)
         if detail_key not in self.results['outcome_details']:
             self.results['outcome_details'][detail_key] = 0
         self.results['outcome_details'][detail_key] += 1
@@ -269,7 +300,7 @@ class BlackjackSimulator:
             f"Player busts: {self.results['player_busts']} ({100 * self.results['player_busts'] / total_hands:.2f}%)",
             f"Dealer busts: {self.results['dealer_busts']} ({100 * self.results['dealer_busts'] / total_hands:.2f}%)",
             f"",
-            f"House edge: {self.results['house_edge']:.4f}%"
+            f"House edge: {self.results['house_edge']:.2f}%"
         ]
         
         return "\n".join(summary)

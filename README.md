@@ -130,3 +130,40 @@ The simulator is set up for a custom variant where:
 3. If player and dealer both bust, the hand pushes
 4. If player and dealer both get blackjack, the hand pushes
 5. A 5% commission is taken from player wins (configurable)
+
+## Understanding Custom Hit Rules
+
+Custom hit rules allow you to define exactly when the player should hit or stand based on their hand value and the dealer's upcard. Here's how they work:
+
+### Format Explanation
+
+The hit rules use this format: `hand_type:player_total:dealer_cards,action`
+
+- **hand_type**: Either `hard` or `soft` (soft hands contain an Ace counted as 11)
+- **player_total**: The total value of the player's hand (e.g., 12, 13, 14, etc.)
+- **dealer_cards**: The dealer's upcard values, separated by `|` (e.g., `2|3|4|5|6`)
+- **action**: Either `hit` or `stand` indicating what the player should do
+
+Multiple rules are combined with semicolons (`;`).
+
+### Example Strategy
+
+For example, to make the player stand on 12 or higher when the dealer shows 2-6, and hit otherwise:
+
+```
+hard:12:2|3|4|5|6,stand;hard:12:7|8|9|10|11,hit;hard:13:2|3|4|5|6,stand;hard:13:7|8|9|10|11,hit;hard:14:2|3|4|5|6,stand;hard:14:7|8|9|10|11,hit;hard:15:2|3|4|5|6,stand;hard:15:7|8|9|10|11,hit;hard:16:2|3|4|5|6,stand;hard:16:7|8|9|10|11,hit
+```
+
+This tells the simulator:
+- Stand on hard 12 when dealer shows 2-6, hit when dealer shows 7-A
+- Stand on hard 13 when dealer shows 2-6, hit when dealer shows 7-A
+- And so on...
+
+### Default Behavior
+
+If you don't specify a rule for a particular scenario, the simulator follows the default behavior:
+- Hit on 16 or less
+- Stand on 17 or more
+- Possibly hit on soft 17 depending on the "Player Hits Soft 17" setting
+
+Remember: In this variant, since you're betting on the dealer's hand winning, an optimal player strategy might be different from traditional blackjack.

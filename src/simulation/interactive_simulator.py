@@ -45,6 +45,7 @@ class InteractiveSimulator(BlackjackSimulator):
         self.current_phase = "player_turn"
         self.step_count += 1
         
+        # If either side has blackjack, complete the hand immediately
         if any(hand.is_blackjack() for hand in self.current_player_hands) or self.current_dealer_hand.is_blackjack():
             return self.complete_hand()
         
