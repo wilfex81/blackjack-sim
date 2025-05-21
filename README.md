@@ -26,16 +26,37 @@ This blackjack simulator allows for precise calculation of house edge by simulat
 
 ## Installation
 
-Clone the repository:
+After receiving the zip file:
 
 ```bash
-git clone (github url/blackjack-sim)
+# Extract the zip file
+unzip blackjack-sim.zip
+
+# Navigate to the project directory
 cd blackjack-sim
+
+# Create and activate a virtual environment (recommended)
+python -m venv venv
+
+# On Linux/Mac
+source venv/bin/activate
+
+# On Windows
+# venv\Scripts\activate
+
+# Install required dependencies
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-Run a simulation with default parameters:
+Run the interactive Streamlit web interface (recommended):
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Alternatively, run a simulation directly from the command line:
 
 ```bash
 python src/main.py
