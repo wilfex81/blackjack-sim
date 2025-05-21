@@ -168,8 +168,10 @@ class BlackjackSimulator:
             self.results['player_wins'] += 1
             
             if result == "player_win_blackjack":
-                # Apply blackjack payout for dealer blackjack
-                win_amount = self.config.blackjack_payout
+                # For blackjack payout, we need to calculate the net win amount
+                # For a 1.5:1 blackjack payout, the player gets their bet back (1) plus 0.5
+                # We need to normalize to the base bet amount of 1
+                win_amount = (self.config.blackjack_payout - 1.0) + 1.0  # Adjust to actual net win amount
                 
                 # Apply commission only if commission_on_blackjack is enabled
                 if self.config.commission_on_blackjack:
@@ -260,7 +262,7 @@ class BlackjackSimulator:
         
         # Calculate final house edge
         if self.results['total_bets'] > 0:
-            self.results['house_edge'] = -self.results['net_win_amount'] / self.results['total_bets'] * 100
+            self.results['house_edge'] = -self.results['net_win_amount'] / self.results['total_bets']
         else:
             self.results['house_edge'] = 0
             

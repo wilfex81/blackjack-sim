@@ -142,7 +142,7 @@ class InteractiveSimulator(BlackjackSimulator):
     def update_current_stats(self):
         """Update the current real-time statistics."""
         if self.results['total_bets'] > 0:
-            house_edge = -self.results['net_win_amount'] / self.results['total_bets'] * 100
+            house_edge = -self.results['net_win_amount'] / self.results['total_bets']
         else:
             house_edge = 0.0
             

@@ -871,7 +871,7 @@ with tab2:
             st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
-            st.metric("House Edge", f"{stats['house_edge']:.2f}%")
+            st.metric("House Edge", f"{stats['house_edge']*100:.2f}%")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
