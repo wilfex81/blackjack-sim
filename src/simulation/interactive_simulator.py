@@ -1,5 +1,11 @@
 from src.simulation.simulator import BlackjackSimulator
 from src.game.hand import Hand
+import math
+
+# Constants for statistical calculations
+MIN_HANDS_FOR_EDGE = 100  # Minimum hands needed before showing house edge
+CONFIDENCE_LEVEL = 0.95  # 95% confidence interval
+Z_SCORE = 1.96  # Z-score for 95% confidence level
 
 class InteractiveSimulator(BlackjackSimulator):
     """
@@ -23,7 +29,10 @@ class InteractiveSimulator(BlackjackSimulator):
             'pushes': 0,
             'player_busts': 0,
             'dealer_busts': 0,
-            'house_edge': 0.0
+            'house_edge': None,
+            'margin_of_error': None,
+            'min_hands_required': MIN_HANDS_FOR_EDGE,
+            'has_sufficient_data': False
         }
     
     def start_new_hand(self):
@@ -140,20 +149,39 @@ class InteractiveSimulator(BlackjackSimulator):
         return self.get_current_state()
     
     def update_current_stats(self):
-        """Update the current real-time statistics."""
-        if self.results['total_bets'] > 0:
-            house_edge = -self.results['net_win_amount'] / self.results['total_bets']
-        else:
-            house_edge = 0.0
+        """Update the current real-time statistics with confidence intervals."""
+        total_hands = self.results['total_bets']
+        
+        if total_hands > 0:
+            # Calculate house edge from net win amount
+            house_edge = -self.results['net_win_amount'] / total_hands
             
+            # Calculate confidence interval if we have enough hands
+            if total_hands >= MIN_HANDS_FOR_EDGE:
+                # Standard error calculation using sample standard deviation
+                p_win = self.results['player_wins'] / total_hands
+                p_loss = self.results['dealer_wins'] / total_hands
+                variance = (p_win * (1 - p_win) + p_loss * (1 - p_loss)) / total_hands
+                standard_error = math.sqrt(variance)
+                margin_of_error = Z_SCORE * standard_error
+            else:
+                house_edge = None  # Don't show edge for small samples
+                margin_of_error = None
+        else:
+            house_edge = None
+            margin_of_error = None
+
         self.current_stats = {
-            'total_hands': self.results['total_bets'],
+            'total_hands': total_hands,
             'player_wins': self.results['player_wins'],
             'dealer_wins': self.results['dealer_wins'],
             'pushes': self.results['pushes'],
             'player_busts': self.results['player_busts'],
             'dealer_busts': self.results['dealer_busts'],
-            'house_edge': house_edge
+            'house_edge': house_edge,
+            'margin_of_error': margin_of_error,
+            'min_hands_required': MIN_HANDS_FOR_EDGE,
+            'has_sufficient_data': total_hands >= MIN_HANDS_FOR_EDGE
         }
     
     def get_current_state(self):

@@ -168,22 +168,26 @@ class BlackjackSimulator:
             self.results['player_wins'] += 1
             
             if result == "player_win_blackjack":
-                # For blackjack payout, we need to calculate the net win amount
-                # For a 1.5:1 blackjack payout, the player gets their bet back (1) plus 0.5
-                # We need to normalize to the base bet amount of 1
-                win_amount = (self.config.blackjack_payout - 1.0) + 1.0  # Adjust to actual net win amount
-                
-                # Apply commission only if commission_on_blackjack is enabled
-                if self.config.commission_on_blackjack:
-                    win_amount *= self.config.get_commission_multiplier()
+                # Player blackjack means higher payout loss
+                try:
+                    numerator, denominator = map(int, self.config.blackjack_payout.split(':'))
+                    win_multiplier = numerator / denominator  # e.g. 6/5 = 1.2 or 3/2 = 1.5
+                except (ValueError, AttributeError):
+                    win_multiplier = float(self.config.blackjack_payout)
+                    
+                # When player gets blackjack, we lose their enhanced payout
+                win_amount = -(1 + (win_multiplier - 1))  # e.g. -(1 + 0.5) = -1.5 for 3:2, -(1 + 0.2) = -1.2 for 6:5
+                self.results['blackjacks'] += 1
             else:
-                # Regular win with commission
-                win_amount = self.config.get_commission_multiplier()
+                # Regular player win - we lose our dealer bet
+                win_amount = -1
                 
             self.results['net_win_amount'] += win_amount
         elif result == "dealer_win":
             self.results['dealer_wins'] += 1
-            self.results['net_win_amount'] -= 1
+            # When dealer wins, we win our bet minus commission
+            win_amount = self.config.get_commission_multiplier()  # e.g. 0.95 for 5% commission
+            self.results['net_win_amount'] += win_amount
         else:  # push
             self.results['pushes'] += 1
             

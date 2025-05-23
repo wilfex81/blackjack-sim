@@ -475,7 +475,7 @@ with tab1:
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown('<div class="metric-container">', unsafe_allow_html=True)
-            st.metric("House Edge", f"{results['house_edge']*100:.2f}%")
+            st.metric("House Edge", f"{results['house_edge']:.2f}%")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
@@ -865,13 +865,24 @@ with tab2:
         stats = st.session_state.current_state["stats"]
         col1, col2, col3 = st.columns(3)
         
+        # Display warning if not enough hands
+        if not stats['has_sufficient_data']:
+            st.warning(f"Need {stats['min_hands_required']} hands for reliable house edge calculation. Currently: {stats['total_hands']} hands.")
+
         with col1:
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
             st.metric("Hands Played", stats["total_hands"])
             st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
-            st.metric("House Edge", f"{stats['house_edge']*100:.2f}%")
+            if stats['house_edge'] is not None:
+                if stats['margin_of_error'] is not None:
+                    st.metric("House Edge", f"{stats['house_edge']*100:.2f}% ± {stats['margin_of_error']*100:.2f}%")
+                    st.caption("95% Confidence Interval")
+                else:
+                    st.metric("House Edge", f"{stats['house_edge']*100:.2f}%")
+            else:
+                st.metric("House Edge", "Insufficient data")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
