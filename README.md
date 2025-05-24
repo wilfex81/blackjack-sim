@@ -9,15 +9,45 @@ This blackjack simulator allows for precise calculation of house edge by simulat
 - Accurately simulate blackjack play as it would occur in real-life
 - Support custom rule variants (including a dealer-betting variant)
 - Generate comprehensive reports of outcomes and statistics
-- Calculate house edge with high precision
+- Calculate both raw and true house edge with high precision
+- Account for commission effects on overall profitability
+
+## Edge Calculation Methodology
+
+The simulator calculates two distinct types of edge:
+
+1. **Raw Edge**: The pure mathematical advantage in the game, calculated as (player win rate - dealer win rate). With both sides having nearly equal win rates (approximately 41%), this typically shows a very small value around ±0.04%, reflecting the near-even nature of the base game. A positive raw edge means the player has a mathematical advantage before commission.
+
+2. **True House Edge**: The actual house advantage after accounting for commission and all payouts, calculated as:
+   dealer_win_rate - (player_win_rate × (1 - commission_pct))
+
+   Components affecting the edge:
+   - Dealer wins (approximately 41%) - collected in full
+   - Player wins (approximately 41%) - paid with commission deducted
+   - Push rate (approximately 17-18%) - no effect on edge
+   - Commission percentage on wins (default 5%)
+   - Special hand payouts (e.g., blackjack bonuses if applicable)
+
+For example, with a 5% commission on player wins, while the raw edge may be near zero (±0.04%), the true house edge is approximately 2.02%. This occurs because while both sides win about equally often, the house collects 100% of dealer wins but only pays 95% on player wins. For a typical win rate of 41%, this 5% commission creates a house advantage of about 2% (41% × 5% = 2.05%). A positive true house edge indicates an advantage for the house.
 
 ## Key Features
 
 - **Accurate Simulation**: Simulates blackjack play exactly as it would occur in a casino
-- **Custom Rules**: Supports a variant where players bet on the dealer's hand with 5% commission
-- **Configurable Parameters**: Adjustable deck count, shuffling method, hitting rules, and more
+- **Custom Rules**: Supports a variant where players bet on the dealer's hand with configurable commission
+- **Edge Calculations**: 
+  - Raw Edge: Pure mathematical win/loss rate difference before commission
+  - True House Edge: Actual edge after commission and payouts are applied
+- **Configurable Parameters**: 
+  - Number of decks (1-8)
+  - Shuffling method (traditional or continuous)
+  - Hitting rules for both player and dealer
+  - Commission percentage
+  - Blackjack payout ratios
+  - And more...
+- **Interactive Mode**: Step-by-step hand simulation with real-time statistics
 - **Comprehensive Reports**: Generates detailed CSV reports for outcome analysis
-- **Statistical Analysis**: Tracks outcome frequencies and calculates house edge
+- **Statistical Analysis**: Tracks win rates, bust rates, and edge calculations
+- **Visualizations**: Multiple chart types for analyzing game outcomes
 
 ## Requirements
 
@@ -189,27 +219,3 @@ If you don't specify a rule for a particular scenario, the simulator follows the
 
 Remember: In this variant, since you're betting on the dealer's hand winning, an optimal player strategy might be different from traditional blackjack.
 
-## House Edge Analysis
-
-Based on extensive simulations with 1 million hands each, here are the calculated house edges for different configurations:
-
-1. With 5% commission:
-   - 6:5 blackjack payout: 0.03% house edge
-   - 3:2 blackjack payout: 0.04% house edge
-
-2. Without commission:
-   - 3:2 blackjack payout: 0.02% house edge
-
-All configurations show consistent patterns:
-- Player win rate: ~41%
-- Dealer win rate: ~41%
-- Push rate: ~18%
-
-The simulator correctly handles:
-- Regular wins/losses (1:1 payout)
-- Commission calculations (5% when applied)
-- Enhanced blackjack payouts:
-  - 3:2 pays 150% (1.5x)
-  - 6:5 pays 120% (1.2x)
-
-These results demonstrate that the house edge remains relatively small across different payout structures, with the commission being the primary factor affecting the edge.

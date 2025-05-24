@@ -168,25 +168,23 @@ class BlackjackSimulator:
             self.results['player_wins'] += 1
             
             if result == "player_win_blackjack":
-                # Player blackjack means higher payout loss
                 try:
                     numerator, denominator = map(int, self.config.blackjack_payout.split(':'))
                     win_multiplier = numerator / denominator  # e.g. 6/5 = 1.2 or 3/2 = 1.5
                 except (ValueError, AttributeError):
                     win_multiplier = float(self.config.blackjack_payout)
-                    
-                # When player gets blackjack, we lose their enhanced payout
-                win_amount = -(1 + (win_multiplier - 1))  # e.g. -(1 + 0.5) = -1.5 for 3:2, -(1 + 0.2) = -1.2 for 6:5
+                # When player gets blackjack, we win enhanced payout
+                win_amount = win_multiplier * self.config.get_commission_multiplier()  # Apply commission to blackjack win
                 self.results['blackjacks'] += 1
             else:
-                # Regular player win - we lose our dealer bet
-                win_amount = -1
+                # Regular player win, apply commission
+                win_amount = self.config.get_commission_multiplier()
                 
             self.results['net_win_amount'] += win_amount
         elif result == "dealer_win":
             self.results['dealer_wins'] += 1
-            # When dealer wins, we win our bet minus commission
-            win_amount = self.config.get_commission_multiplier()  # e.g. 0.95 for 5% commission
+            # When dealer wins, we lose our bet
+            win_amount = -1
             self.results['net_win_amount'] += win_amount
         else:  # push
             self.results['pushes'] += 1

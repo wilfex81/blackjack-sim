@@ -419,12 +419,20 @@ with tab1:
             report_generator.generate_summary(f"blackjack_sim_summary_{timestamp}.txt")
         
         total_hands = results['total_bets']
+        # Raw percentages
         player_win_rate = results['player_wins'] / total_hands if total_hands > 0 else 0
         dealer_win_rate = results['dealer_wins'] / total_hands if total_hands > 0 else 0
         push_rate = results['pushes'] / total_hands if total_hands > 0 else 0
         player_bust_rate = results['player_busts'] / total_hands if total_hands > 0 else 0
         dealer_bust_rate = results['dealer_busts'] / total_hands if total_hands > 0 else 0
-        house_edge = results['house_edge']
+        # Raw edge (basic win/loss difference before commission)
+        raw_edge = (player_win_rate - dealer_win_rate) * 100
+        
+        # True house edge calculation including commission
+        win_multiplier = 1.0 - (sim_config.commission_pct / 100.0)
+        # When dealer wins, we win (no commission). When player wins, we lose with commission
+        net_win = dealer_win_rate - (player_win_rate * win_multiplier)
+        house_edge = net_win * 100  # Positive means house advantage
         
         summary_data = {
             "timestamp": timestamp,
@@ -432,6 +440,7 @@ with tab1:
             "results": results,
             "simulation_time": simulation_time,
             "house_edge": house_edge,
+            "raw_edge": raw_edge,
             "player_win_rate": player_win_rate,
             "dealer_win_rate": dealer_win_rate,
             "push_rate": push_rate,
@@ -475,7 +484,13 @@ with tab1:
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown('<div class="metric-container">', unsafe_allow_html=True)
-            st.metric("House Edge", f"{results['house_edge']:.2f}%")
+            st.metric("Raw Edge", f"{results['raw_edge']:.2f}%",
+                     help="Raw win/loss difference before payouts and commissions")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+            st.metric("True House Edge", f"{results['house_edge']:.2f}%", 
+                     help="House edge after applying payouts and commissions")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
@@ -864,10 +879,6 @@ with tab2:
         
         stats = st.session_state.current_state["stats"]
         col1, col2, col3 = st.columns(3)
-        
-        # Display warning if not enough hands
-        if not stats['has_sufficient_data']:
-            st.warning(f"Need {stats['min_hands_required']} hands for reliable house edge calculation. Currently: {stats['total_hands']} hands.")
 
         with col1:
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
@@ -876,31 +887,33 @@ with tab2:
             
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
             if stats['house_edge'] is not None:
-                if stats['margin_of_error'] is not None:
-                    st.metric("House Edge", f"{stats['house_edge']*100:.2f}% ± {stats['margin_of_error']*100:.2f}%")
-                    st.caption("95% Confidence Interval")
-                else:
-                    st.metric("House Edge", f"{stats['house_edge']*100:.2f}%")
+                st.metric("True House Edge", f"{stats['house_edge']*100:.2f}%",
+                         help="House edge after applying payouts and commissions")
+                # Calculate and store raw edge
+                stats['raw_edge'] = ((stats['player_wins'] - stats['dealer_wins']) / 
+                                   max(stats['total_hands'], 1) * 100)
+                st.metric("Raw Edge", f"{stats['raw_edge']:.2f}%",
+                         help="Raw win/loss difference before payouts and commissions")
             else:
-                st.metric("House Edge", "Insufficient data")
+                st.metric("House Edge", "Calculating...")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
-            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
-            st.metric("Player Wins", f"{stats['player_wins']} ({100*stats['player_wins']/max(stats['total_hands'],1):.1f}%)")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
-            st.metric("Player Busts", f"{stats['player_busts']} ({100*stats['player_busts']/max(stats['total_hands'],1):.1f}%)")
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col3:
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
             st.metric("Dealer Wins", f"{stats['dealer_wins']} ({100*stats['dealer_wins']/max(stats['total_hands'],1):.1f}%)")
             st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('<div class="stats-box">', unsafe_allow_html=True)
             st.metric("Dealer Busts", f"{stats['dealer_busts']} ({100*stats['dealer_busts']/max(stats['total_hands'],1):.1f}%)")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("Player Wins", f"{stats['player_wins']} ({100*stats['player_wins']/max(stats['total_hands'],1):.1f}%)")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="stats-box">', unsafe_allow_html=True)
+            st.metric("Player Busts", f"{stats['player_busts']} ({100*stats['player_busts']/max(stats['total_hands'],1):.1f}%)")
             st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown('<div class="stats-box">', unsafe_allow_html=True)
