@@ -126,7 +126,7 @@ class InteractiveSimulator(BlackjackSimulator):
             "display_result": "Player Win" if result == "player_win" else ("Dealer Win" if result == "dealer_win" else "Push")
         }
         
-        self.update_statistics(result, player_value, dealer_value)
+        self.update_statistics(result, player_value, dealer_value, player_hand, self.current_dealer_hand)
         self.update_current_stats()
         
         self.hand_history.append({
