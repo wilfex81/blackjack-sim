@@ -93,99 +93,85 @@ class BlackjackSimulator:
             tuple: (result, player_final_value, dealer_final_value)
             where result is one of: "player_win", "dealer_win", "push"
         """
-        # Check for blackjack first - if either has blackjack, the hand ends immediately
+        # Check for blackjack first
         player_blackjack = player_hand.is_blackjack()
         dealer_blackjack = dealer_hand.is_blackjack()
         
         # If both have blackjack, it's a push
         if player_blackjack and dealer_blackjack:
-            self.results['blackjacks'] += 1
             return "push", 21, 21
             
-        # If player has blackjack, player hand > dealer hand
-        if player_blackjack:
-            self.results['blackjacks'] += 1
-            return "dealer_win", 21, dealer_hand.get_value()  # In this variant, dealer wins means player loses
+        # If dealer has blackjack, we win with 3:2 payout (no commission)
+        if dealer_blackjack and not player_blackjack:
+            return "dealer_blackjack", player_hand.get_value(), 21
             
-        # If dealer has blackjack, dealer hand > player hand
-        if dealer_blackjack:
-            self.results['blackjacks'] += 1
-            # Mark this as a dealer blackjack win for the payout calculation
-            return "player_win_blackjack", player_hand.get_value(), 21  # Special result code for blackjack payout
+        # If player has blackjack, we lose
+        if player_blackjack and not dealer_blackjack:
+            return "player_blackjack", 21, dealer_hand.get_value()
         
-        # Get the dealer's up card for strategy decisions
+        # Get dealer's up card for strategy decisions
         dealer_up_card = dealer_hand.get_dealer_up_card()
         
         # Player draws cards
         while self.player_strategy.should_hit(player_hand, dealer_up_card):
             player_hand.add_card(self.shoe.draw())
             
-        # Remember player's final hand value
         player_value = player_hand.get_value()
-        
-        # If player busts, dealer doesn't need to play (custom rule: if both bust, it's a push)
         player_busted = player_hand.is_bust()
         
         # Dealer draws cards
         while self.dealer_strategy.should_hit(dealer_hand):
             dealer_hand.add_card(self.shoe.draw())
             
-        # Calculate final results
         dealer_value = dealer_hand.get_value()
         dealer_busted = dealer_hand.is_bust()
         
-        # In the custom variant, the player bets on the dealer winning
-        # Player busts but dealer doesn't = dealer wins = player wins their bet
-        # Player doesn't bust but dealer does = dealer loses = player loses their bet
-        # Both bust or both don't bust with same value = push
-        
+        # In this variant, betting on dealer:
+        # If dealer wins the hand, we win (since we bet on dealer)
+        # If player wins the hand, we lose (since we bet on dealer)
         if player_busted and dealer_busted:
-            result = "push"
+            return "push", player_value, dealer_value
         elif player_busted:
-            result = "player_win"  # Player busts, dealer doesn't - player wins (betting on dealer)
+            return "dealer_win", player_value, dealer_value  # Regular win
         elif dealer_busted:
-            result = "dealer_win"  # Dealer busts, player doesn't - dealer wins (player loses bet)
+            return "player_win", player_value, dealer_value  # Loss
         elif player_value > dealer_value:
-            result = "dealer_win"  # Player hand > dealer hand - dealer wins (player loses bet)
+            return "player_win", player_value, dealer_value  # Loss
         elif dealer_value > player_value:
-            result = "player_win"  # Dealer hand > player hand - player wins their bet
+            return "dealer_win", player_value, dealer_value  # Regular win
         else:
-            result = "push"  # Equal values
-            
-        return result, player_value, dealer_value
+            return "push", player_value, dealer_value
     
-    def update_statistics(self, result, player_value, dealer_value):
+    def update_statistics(self, result, player_value, dealer_value, player_hand, dealer_hand):
         """
         Update simulation statistics.
         
         Args:
-            result (str): Result of the hand ("player_win", "dealer_win", "push", "player_win_blackjack")
+            result (str): Result of the hand ("dealer_win", "player_win", "push", "dealer_blackjack", "player_blackjack")
             player_value (int): Final value of the player's hand
             dealer_value (int): Final value of the dealer's hand
+            player_hand (Hand): The player's hand
+            dealer_hand (Hand): The dealer's hand
         """
-        # Update win/loss/push counts
-        if result == "player_win" or result == "player_win_blackjack":
-            self.results['player_wins'] += 1
+        # Track win/loss/push counts and calculate payouts
+        if result == "dealer_win":
+            self.results['player_wins'] += 1  # We win when dealer wins
+            # Regular win - apply commission
+            win_amount = self.config.get_commission_multiplier()
+            self.results['net_win_amount'] += win_amount
             
-            if result == "player_win_blackjack":
-                try:
-                    numerator, denominator = map(int, self.config.blackjack_payout.split(':'))
-                    win_multiplier = numerator / denominator  # e.g. 6/5 = 1.2 or 3/2 = 1.5
-                except (ValueError, AttributeError):
-                    win_multiplier = float(self.config.blackjack_payout)
-                # When player gets blackjack, we win enhanced payout
-                win_amount = win_multiplier * self.config.get_commission_multiplier()  # Apply commission to blackjack win
-                self.results['blackjacks'] += 1
-            else:
-                # Regular player win, apply commission
-                win_amount = self.config.get_commission_multiplier()
-                
+        elif result == "dealer_blackjack":
+            self.results['player_wins'] += 1
+            self.results['blackjacks'] += 1
+            # Blackjack win - 3:2 payout with no commission
+            win_amount = self.config.blackjack_payout
             self.results['net_win_amount'] += win_amount
-        elif result == "dealer_win":
-            self.results['dealer_wins'] += 1
-            # When dealer wins, we lose our bet
-            win_amount = -1
-            self.results['net_win_amount'] += win_amount
+            
+        elif result in ["player_win", "player_blackjack"]:
+            self.results['dealer_wins'] += 1  # We lose when player wins
+            # Lose entire bet
+            self.results['net_win_amount'] -= 1
+            
         else:  # push
             self.results['pushes'] += 1
             
@@ -195,23 +181,23 @@ class BlackjackSimulator:
         if dealer_value > 21:
             self.results['dealer_busts'] += 1
             
-        # Track outcome matrix frequencies
-        player_key = min(player_value, 30)  # Cap at 30 to keep matrix manageable
+        # Track outcome frequencies
+        player_key = min(player_value, 30)  # Cap at 30 for matrix
         dealer_key = min(dealer_value, 30)
         
+        # Update outcome matrix
         outcome_key = (player_key, dealer_key)
         if outcome_key not in self.results['outcome_matrix']:
             self.results['outcome_matrix'][outcome_key] = 0
         self.results['outcome_matrix'][outcome_key] += 1
         
-        # Detailed outcomes - standardize result for storage
-        result_for_storage = "player_win" if result == "player_win_blackjack" else result
-        detail_key = (player_key, dealer_key, result_for_storage)
+        # Update detailed outcomes
+        detail_key = (player_key, dealer_key, result)
         if detail_key not in self.results['outcome_details']:
             self.results['outcome_details'][detail_key] = 0
         self.results['outcome_details'][detail_key] += 1
         
-        # Increment total bets
+        # Count total hands
         self.results['total_bets'] += 1
     
     def run_simulation(self):
@@ -241,9 +227,9 @@ class BlackjackSimulator:
                 result, player_value, dealer_value = self.play_hand(player_hand, dealer_hand)
                 
                 # Update stats
-                self.update_statistics(result, player_value, dealer_value)
+                self.update_statistics(result, player_value, dealer_value, player_hand, dealer_hand)
                 
-                # Collect used cards for return to shoe
+                # Collect used cards
                 used_cards.extend(player_hand.cards)
             
             # Add dealer cards to used pile
@@ -252,7 +238,7 @@ class BlackjackSimulator:
             # Return cards to shoe
             self.shoe.return_to_discard(used_cards)
             
-            # Periodic progress update
+            # Progress updates
             if (hand_num + 1) % progress_interval == 0:
                 progress_pct = 100 * (hand_num + 1) / self.config.num_hands
                 elapsed = time.time() - start_time
@@ -264,7 +250,25 @@ class BlackjackSimulator:
         
         # Calculate final house edge
         if self.results['total_bets'] > 0:
-            self.results['house_edge'] = -self.results['net_win_amount'] / self.results['total_bets']
+            total_hands = self.results['total_bets']
+            blackjack_hands = self.results['blackjacks']
+            
+            # Calculate win rates excluding blackjacks
+            reg_win_rate = (self.results['player_wins'] - blackjack_hands) / total_hands
+            blackjack_rate = blackjack_hands / total_hands
+            lose_rate = self.results['dealer_wins'] / total_hands
+            
+            # Expected value calculation:
+            # Regular wins: Pay 1:1 with commission
+            # Blackjack wins: Pay 3:2 with no commission
+            # Losses: Lose entire bet
+            commission_mult = 1.0 - (self.config.commission_pct / 100.0)
+            expected_value = (reg_win_rate * commission_mult)  # Regular wins after commission
+            expected_value += (blackjack_rate * self.config.blackjack_payout)  # Blackjack wins
+            expected_value -= lose_rate  # Losses
+            
+            # House edge is negative of player expectation
+            self.results['house_edge'] = -expected_value * 100
         else:
             self.results['house_edge'] = 0
             

@@ -350,6 +350,14 @@ with tab1:
         
         submit_button = st.form_submit_button("Run Simulation")
 
+    def parse_ratio(ratio_str):
+        """Convert a ratio string (e.g. "6:5") to a decimal multiplier."""
+        try:
+            num, denom = map(float, ratio_str.split(':'))
+            return num / denom
+        except:
+            return 1.0  # Default to 1:1 payout if parsing fails
+
     def run_simulation_advanced(config):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
@@ -392,7 +400,7 @@ with tab1:
             dealer_hit_soft_17=config["dealer_hits_soft_17"],  
             reshuffle_cutoff=config.get("reshuffle_threshold", 52) if config["shuffle_method"] != "Continuous shuffle" else 0,
             commission_pct=config["commission"],
-            blackjack_payout=float(config["blackjack_payout"].split(":")[0]),
+            blackjack_payout=parse_ratio(config["blackjack_payout"]),
             num_players=config.get("num_players", 1),
             player_hit_rules=hit_rules_dict if hit_rules_dict else None,
             commission_on_blackjack=config["commission_on_blackjack"]
@@ -429,10 +437,8 @@ with tab1:
         raw_edge = (player_win_rate - dealer_win_rate) * 100
         
         # True house edge calculation including commission
-        win_multiplier = 1.0 - (sim_config.commission_pct / 100.0)
-        # When dealer wins, we win (no commission). When player wins, we lose with commission
-        net_win = dealer_win_rate - (player_win_rate * win_multiplier)
-        house_edge = net_win * 100  # Positive means house advantage
+        # Use the simulator's house edge calculation which properly accounts for all payouts
+        house_edge = results['house_edge']
         
         summary_data = {
             "timestamp": timestamp,
@@ -721,7 +727,7 @@ with tab2:
                 dealer_hit_soft_17=dealer_hits_soft_17,  
                 reshuffle_cutoff=reshuffle_threshold if shuffle_method != "Continuous shuffle" else 0,
                 commission_pct=commission,
-                blackjack_payout=float(blackjack_payout.split(":")[0]),
+                blackjack_payout=parse_ratio(blackjack_payout),
                 num_players=1,
                 player_hit_rules=hit_rules_dict if hit_rules_dict else None,
                 commission_on_blackjack=commission_on_blackjack
@@ -1637,3 +1643,4 @@ with tab4:
 # Footer
 st.markdown("---")
 st.markdown("Blackjack Simulator © 2025 | Created with Streamlit")
+
