@@ -14,7 +14,101 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from src.simulation.config import SimulationConfig
 from src.simulation.simulator import BlackjackSimulator
 from src.simulation.interactive_simulator import InteractiveSimulator
+from src.simulation.sidebet_simulator import SidebetSimulator, InteractiveSidebetSimulator
 from src.reporting.report_generator import ReportGenerator
+
+# Custom CSS for card styling
+def load_custom_css():
+    st.markdown("""
+    <style>
+    .card {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 40px;
+        height: 60px;
+        margin-right: 5px;
+        font-size: 18px;
+        font-weight: bold;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        background-color: white;
+    }
+    
+    .card.hearts, .card.diamonds {
+        color: red;
+    }
+    
+    .card.clubs, .card.spades {
+        color: black;
+    }
+    
+    .progress-bar {
+        background-color: #22c55e;
+        height: 4px;
+        margin-bottom: 15px;
+        border-radius: 2px;
+    }
+    
+    .hand-value {
+        margin-top: 5px;
+        font-weight: bold;
+    }
+    
+    .hand-label {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .result-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 3px;
+        color: white;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    
+    .result-win {
+        background-color: #22c55e;
+    }
+    
+    .result-loss {
+        background-color: #ef4444;
+    }
+    
+    .result-push {
+        background-color: #f59e0b;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Card rendering utility function
+def render_card(card_str):
+    if not card_str:
+        return ""
+        
+    parts = card_str.split(" of ")
+    if len(parts) != 2:
+        return card_str
+        
+    rank, suit = parts
+    
+    suit_class = suit.lower()
+    rank_display = rank
+    if rank == "10":
+        rank_display = "10"
+    elif rank == "Jack":
+        rank_display = "J"
+    elif rank == "Queen":
+        rank_display = "Q"
+    elif rank == "King":
+        rank_display = "K"
+    elif rank == "Ace":
+        rank_display = "A"
+        
+    return f'<div class="card {suit_class}">{rank_display}</div>'
 
 class StreamlitReportGenerator:
     """
@@ -185,6 +279,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Load custom CSS for styling
+load_custom_css()
+
 st.markdown("""
 <style>
     .main-header {
@@ -264,7 +361,7 @@ def load_simulation_results():
     results.sort(key=lambda x: x['timestamp'], reverse=True)
     return results
 
-tab1, tab2, tab3, tab4 = st.tabs(["Run Simulation", "Hand-by-Hand Simulation", "Data Visualization", "Previous Results"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Run Simulation", "Hand-by-Hand Simulation", "Sidebet Simulation", "Data Visualization", "Previous Results"])
 
 with tab1:
     st.markdown('<div class="section-header">Configure and Run Simulation</div>', unsafe_allow_html=True)
@@ -335,6 +432,12 @@ with tab1:
             
             commission_on_blackjack = st.checkbox("Apply Commission to Blackjack Wins", value=True)
             
+            hit_against_blackjack = st.checkbox(
+                "Allow Hit Against Dealer Blackjack", 
+                value=False,
+                help="If checked, player can continue to hit when dealer has blackjack (will not result in a push if 21 is reached)"
+            )
+            
             st.markdown("### Simulation Options")
             
             save_results = st.checkbox("Save Simulation Results", value=True)
@@ -403,7 +506,8 @@ with tab1:
             blackjack_payout=parse_ratio(config["blackjack_payout"]),
             num_players=config.get("num_players", 1),
             player_hit_rules=hit_rules_dict if hit_rules_dict else None,
-            commission_on_blackjack=config["commission_on_blackjack"]
+            commission_on_blackjack=config["commission_on_blackjack"],
+            hit_against_blackjack=config.get("hit_against_blackjack", False)
         )
         
         if config["save_results"]:
@@ -472,6 +576,7 @@ with tab1:
                 "commission": commission,
                 "blackjack_payout": blackjack_payout,
                 "commission_on_blackjack": commission_on_blackjack,
+                "hit_against_blackjack": hit_against_blackjack,
                 "num_players": num_players,
                 "save_results": save_results,
                 "generate_visuals": generate_visuals,
@@ -677,6 +782,13 @@ with tab2:
             
             commission_on_blackjack = st.checkbox("Apply Commission to Blackjack Wins", value=True, key="interactive_commission_on_blackjack")
             
+            hit_against_blackjack = st.checkbox(
+                "Allow Hit Against Dealer Blackjack", 
+                value=False,
+                key="interactive_hit_against_blackjack",
+                help="If checked, player can continue to hit when dealer has blackjack (will not result in a push if 21 is reached)"
+            )
+            
             st.markdown("### Advanced Strategy Options")
             custom_hit_rules = st.text_area(
                 "Custom Hit Rules", 
@@ -730,7 +842,8 @@ with tab2:
                 blackjack_payout=parse_ratio(blackjack_payout),
                 num_players=1,
                 player_hit_rules=hit_rules_dict if hit_rules_dict else None,
-                commission_on_blackjack=commission_on_blackjack
+                commission_on_blackjack=commission_on_blackjack,
+                hit_against_blackjack=hit_against_blackjack
             )
             
             st.session_state.interactive_simulator = InteractiveSimulator(sim_config)
@@ -777,31 +890,6 @@ with tab2:
             st.info(f"Current Phase: {st.session_state.current_state['phase'].replace('_', ' ').title()}")
         
         st.markdown("### Current Hand")
-        
-        def render_card(card_str):
-            if not card_str:
-                return ""
-                
-            parts = card_str.split(" of ")
-            if len(parts) != 2:
-                return card_str
-                
-            rank, suit = parts
-            
-            suit_class = suit.lower()
-            rank_display = rank
-            if rank == "10":
-                rank_display = "10"
-            elif rank == "Jack":
-                rank_display = "J"
-            elif rank == "Queen":
-                rank_display = "Q"
-            elif rank == "King":
-                rank_display = "K"
-            elif rank == "Ace":
-                rank_display = "A"
-                
-            return f'<div class="card {suit_class}">{rank_display}</div>'
         
         def render_hand(hand_data, is_dealer=False, hide_second_card=False):
             html = '<div class="card-hand">'
@@ -953,7 +1041,8 @@ with tab2:
                 "Number of Hands to Auto-Play", 
                 min_value=1,
                 max_value=100,
-                value=10
+                value=10,
+                key="auto_play_hands_1"
             )
             
             delay = st.slider(
@@ -961,7 +1050,8 @@ with tab2:
                 min_value=0.1,
                 max_value=2.0,
                 value=0.5,
-                step=0.1
+                step=0.1,
+                key="delay_slider_1"
             )
             
             auto_play = st.button("Start Auto-Play", key="auto_play_btn")
@@ -1043,6 +1133,807 @@ with tab2:
         """)
 
 with tab3:
+    st.markdown('<div class="section-header">Push Sidebet Simulation</div>', unsafe_allow_html=True)
+    st.markdown("""
+    This tab allows you to simulate the sidebet that pays when the player and dealer push (tie).
+    You can choose to have payouts based on either the total hand value or the total number of cards.
+    """)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Sidebet Configuration")
+        
+        sidebet_mode = st.radio(
+            "Payout Mode",
+            options=["Hand Total", "Card Count"],
+            index=0,
+            help="Choose to pay based on the total value of the hand or the total number of cards between player and dealer"
+        )
+        
+        # Convert to the mode string used in the config
+        sidebet_payout_mode = "total" if sidebet_mode == "Hand Total" else "cards"
+        
+        st.markdown("### Game Rules")
+        
+        num_hands = st.number_input(
+            "Number of Hands to Simulate", 
+            min_value=100, 
+            max_value=100000000, 
+            value=10000,
+            step=1000,
+            key="sidebet_num_hands"
+        )
+        
+        num_decks = st.number_input(
+            "Number of Decks", 
+            min_value=1, 
+            max_value=8, 
+            value=6,
+            key="sidebet_num_decks"
+        )
+        
+        player_hits_soft_17 = st.checkbox("Player Hits Soft 17", value=False, key="sidebet_player_hits_soft17")
+        dealer_hits_soft_17 = st.checkbox("Dealer Hits Soft 17", value=False, key="sidebet_dealer_hits_soft17")
+        
+        hit_against_blackjack = st.checkbox(
+            "Allow Hit Against Dealer Blackjack", 
+            value=False,
+            help="If checked, player can continue to hit when dealer has blackjack (will not result in a push if 21 is reached)"
+        )
+        
+        shuffle_method = st.selectbox(
+            "Shuffle Method",
+            options=["Reshuffle at threshold", "Continuous shuffle"],
+            index=0,
+            key="sidebet_shuffle_method"
+        )
+        
+        if shuffle_method == "Reshuffle at threshold":
+            reshuffle_threshold = st.number_input(
+                "Reshuffle Threshold (cards remaining)", 
+                min_value=0, 
+                max_value=104, 
+                value=52,
+                key="sidebet_reshuffle_threshold"
+            )
+        else:
+            reshuffle_threshold = 0
+    
+    with col2:
+        st.markdown("### Payout Configuration")
+        
+        if sidebet_mode == "Hand Total":
+            # Hand total payouts
+            st.markdown("#### Payout Multipliers by Hand Total")
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                payout_17 = st.number_input("17 vs 17 Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_18 = st.number_input("18 vs 18 Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_19 = st.number_input("19 vs 19 Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_bust = st.number_input("Bust vs Bust Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+            
+            with col_b:
+                payout_20 = st.number_input("20 vs 20 Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_21 = st.number_input("21 vs 21 Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_bj = st.number_input("Blackjack vs Blackjack Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+            
+            sidebet_payouts = {
+                17: payout_17,
+                18: payout_18,
+                19: payout_19,
+                20: payout_20,
+                21: payout_21,
+                'bust-bust': payout_bust,
+                'blackjack-blackjack': payout_bj
+            }
+        else:
+            # Card count payouts
+            st.markdown("#### Payout Multipliers by Card Count")
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                payout_4 = st.number_input("4 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_5 = st.number_input("5 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_6 = st.number_input("6 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_7 = st.number_input("7 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_8 = st.number_input("8 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+            
+            with col_b:
+                payout_9 = st.number_input("9 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_10 = st.number_input("10 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_11 = st.number_input("11 Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+                payout_12plus = st.number_input("12+ Cards Payout (X:1)", min_value=0, max_value=100, value=1, step=1)
+            
+            sidebet_payouts = {
+                4: payout_4,
+                5: payout_5,
+                6: payout_6,
+                7: payout_7,
+                8: payout_8,
+                9: payout_9,
+                10: payout_10,
+                11: payout_11,
+                '12+': payout_12plus
+            }
+        
+        st.markdown("### Simulation Options")
+        save_results = st.checkbox("Save Simulation Results", value=True, key="sidebet_save_results")
+        generate_visuals = st.checkbox("Generate Visualizations", value=True, key="sidebet_generate_visuals")
+    
+    run_sidebet_sim = st.button("Run Sidebet Simulation", type="primary", use_container_width=True)
+    
+    if run_sidebet_sim:
+        with st.spinner('Running sidebet simulation... This may take a moment.'):
+            # Create the simulation configuration
+            sim_config = SimulationConfig(
+                num_decks=num_decks,
+                num_hands=num_hands,
+                player_hit_soft_17=player_hits_soft_17,
+                dealer_hit_soft_17=dealer_hits_soft_17,  
+                reshuffle_cutoff=reshuffle_threshold if shuffle_method != "Continuous shuffle" else 0,
+                hit_against_blackjack=hit_against_blackjack,
+                sidebet_payout_mode=sidebet_payout_mode,
+                sidebet_payouts=sidebet_payouts
+            )
+            
+            # Save config if requested
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if save_results:
+                os.makedirs("config", exist_ok=True)
+                config_file = f"config/sidebet_config_{timestamp}.json"
+                with open(config_file, "w") as f:
+                    json.dump(sim_config.to_dict(), f, indent=4)
+            
+            # Run the simulation
+            simulator = SidebetSimulator(sim_config)
+            start_time = time.time()
+            results = simulator.run_simulation()
+            end_time = time.time()
+            simulation_time = end_time - start_time
+            
+            # Generate reports
+            report_generator = StreamlitReportGenerator(results, sim_config)
+            
+            if save_results:
+                os.makedirs("results", exist_ok=True)
+                report_generator.generate_detailed_csv(f"sidebet_sim_detailed_{timestamp}.csv")
+                report_generator.generate_matrix_csv(f"sidebet_sim_matrix_{timestamp}.csv")
+                report_generator.generate_summary(f"sidebet_sim_summary_{timestamp}.txt")
+            
+            # Display results
+            st.success(f"Simulation completed! {num_hands} hands simulated in {simulation_time:.2f} seconds.")
+            
+            st.markdown('<div class="section-header">Sidebet Simulation Results</div>', unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+                st.metric("Total Push Rate", f"{results['total_pushes'] / results['total_bets'] * 100:.2f}%",
+                        help="How often the player and dealer push")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+                st.metric("Sidebet House Edge", f"{results['sidebet_edge']:.2f}%", 
+                        help="House edge on the sidebet")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+                st.metric("Main Bet House Edge", f"{results['house_edge']:.2f}%")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+                st.metric("Player Blackjacks", f"{results['player_blackjacks']} ({results['player_blackjacks'] / results['total_bets'] * 100:.2f}%)")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+                st.metric("Dealer Blackjacks", f"{results['dealer_blackjacks']} ({results['dealer_blackjacks'] / results['total_bets'] * 100:.2f}%)")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Display push breakdown
+            st.markdown("### Push Breakdown")
+            
+            if sidebet_mode == "Hand Total":
+                # Create a table for push breakdown by value
+                pushes_by_value = results['pushes_by_value']
+                total_pushes = results['total_pushes']
+                
+                value_data = []
+                for value, count in pushes_by_value.items():
+                    percentage = count / total_pushes * 100 if total_pushes > 0 else 0
+                    payout = sidebet_payouts.get(value, 0) if isinstance(value, int) else sidebet_payouts.get(str(value), 0)
+                    value_data.append({
+                        "Value": value,
+                        "Count": count,
+                        "Percentage": f"{percentage:.2f}%",
+                        "Payout": f"{payout}:1"
+                    })
+                
+                value_df = pd.DataFrame(value_data)
+                st.dataframe(value_df, use_container_width=True)
+                
+                # Plot the push distribution by value
+                if generate_visuals:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    values = [str(v) for v in pushes_by_value.keys()]
+                    counts = list(pushes_by_value.values())
+                    
+                    bars = ax.bar(values, counts)
+                    
+                    # Add value labels on top of bars
+                    for bar in bars:
+                        height = bar.get_height()
+                        ax.text(bar.get_x() + bar.get_width()/2., height,
+                                f'{height}',
+                                ha='center', va='bottom')
+                    
+                    ax.set_xlabel('Hand Value')
+                    ax.set_ylabel('Number of Pushes')
+                    ax.set_title('Push Distribution by Hand Value')
+                    st.pyplot(fig)
+            else:
+                # Create a table for push breakdown by card count
+                pushes_by_cards = results['pushes_by_card_count']
+                total_pushes = results['total_pushes']
+                
+                card_data = []
+                for cards, count in pushes_by_cards.items():
+                    percentage = count / total_pushes * 100 if total_pushes > 0 else 0
+                    payout = sidebet_payouts.get(cards, 0) if isinstance(cards, int) else sidebet_payouts.get(str(cards), 0)
+                    card_data.append({
+                        "Card Count": cards,
+                        "Count": count,
+                        "Percentage": f"{percentage:.2f}%",
+                        "Payout": f"{payout}:1"
+                    })
+                
+                card_df = pd.DataFrame(card_data)
+                st.dataframe(card_df, use_container_width=True)
+                
+                # Plot the push distribution by card count
+                if generate_visuals:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    cards = [str(c) for c in pushes_by_cards.keys()]
+                    counts = list(pushes_by_cards.values())
+                    
+                    bars = ax.bar(cards, counts)
+                    
+                    # Add value labels on top of bars
+                    for bar in bars:
+                        height = bar.get_height()
+                        ax.text(bar.get_x() + bar.get_width()/2., height,
+                                f'{height}',
+                                ha='center', va='bottom')
+                    
+                    ax.set_xlabel('Total Cards')
+                    ax.set_ylabel('Number of Pushes')
+                    ax.set_title('Push Distribution by Card Count')
+                    st.pyplot(fig)
+            
+            if save_results:
+                st.info(f"""
+                Results have been saved to the following files:
+                - Configuration: `config/sidebet_config_{timestamp}.json`
+                - Detailed CSV: `results/sidebet_sim_detailed_{timestamp}.csv`
+                - Matrix CSV: `results/sidebet_sim_matrix_{timestamp}.csv`
+                - Summary: `results/sidebet_sim_summary_{timestamp}.txt`
+                """)
+    
+    # Add a horizontal separator
+    st.markdown("---")
+    
+    # Interactive Sidebet Simulator
+    st.markdown('<div class="section-header">Interactive Sidebet Hand-by-Hand Simulation</div>', unsafe_allow_html=True)
+    st.markdown("""
+    This mode allows you to see each hand being played step-by-step and observe the sidebet outcomes
+    as you play through individual hands.
+    """)
+    
+    if "interactive_sidebet_simulator" not in st.session_state:
+        st.session_state.interactive_sidebet_simulator = None
+        st.session_state.sidebet_current_state = None
+    
+    with st.expander("Interactive Sidebet Configuration", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            int_sidebet_mode = st.radio(
+                "Payout Mode",
+                options=["Hand Total", "Card Count"],
+                index=0,
+                key="int_sidebet_mode",
+                help="Choose to pay based on the total value of the hand or the total number of cards between player and dealer"
+            )
+            
+            # Convert to the mode string used in the config
+            int_sidebet_payout_mode = "total" if int_sidebet_mode == "Hand Total" else "cards"
+            
+            int_num_decks = st.number_input(
+                "Number of Decks", 
+                min_value=1, 
+                max_value=8, 
+                value=6,
+                key="int_sidebet_num_decks"
+            )
+            
+            int_player_hits_soft_17 = st.checkbox(
+                "Player Hits Soft 17", 
+                value=False,
+                key="int_sidebet_player_hits_soft_17"
+            )
+            
+            int_hit_against_blackjack = st.checkbox(
+                "Allow Hit Against Dealer Blackjack", 
+                value=False,
+                key="int_sidebet_hit_against_blackjack",
+                help="If checked, player can continue to hit when dealer has blackjack (will not result in a push if 21 is reached)"
+            )
+                
+        with col2:
+            int_dealer_hits_soft_17 = st.checkbox(
+                "Dealer Hits Soft 17", 
+                value=False,
+                key="int_sidebet_dealer_hits_soft_17"
+            )
+            
+            int_shuffle_method = st.selectbox(
+                "Shuffle Method",
+                options=["Reshuffle at threshold", "Continuous shuffle"],
+                index=0,
+                key="int_sidebet_shuffle_method"
+            )
+            
+            if int_shuffle_method == "Reshuffle at threshold":
+                int_reshuffle_threshold = st.number_input(
+                    "Reshuffle Threshold (cards remaining)", 
+                    min_value=0, 
+                    max_value=104, 
+                    value=52,
+                    key="int_sidebet_reshuffle_threshold"
+                )
+            else:
+                int_reshuffle_threshold = 0
+            
+            # Add payouts based on the selected mode
+            if int_sidebet_mode == "Hand Total":
+                int_sidebet_payouts = {
+                    17: st.number_input("17 vs 17 Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_17"),
+                    18: st.number_input("18 vs 18 Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_18"),
+                    19: st.number_input("19 vs 19 Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_19"),
+                    20: st.number_input("20 vs 20 Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_20"),
+                    21: st.number_input("21 vs 21 Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_21"),
+                    'bust-bust': st.number_input("Bust vs Bust Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_bust"),
+                    'blackjack-blackjack': st.number_input("BJ vs BJ Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_bj")
+                }
+            else:
+                int_sidebet_payouts = {
+                    4: st.number_input("4 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_4"),
+                    5: st.number_input("5 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_5"),
+                    6: st.number_input("6 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_6"),
+                    7: st.number_input("7 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_7"),
+                    8: st.number_input("8 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_8"),
+                    9: st.number_input("9 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_9"),
+                    10: st.number_input("10 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_10"),
+                    11: st.number_input("11 Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_11"),
+                    '12+': st.number_input("12+ Cards Payout", min_value=0, max_value=100, value=1, step=1, key="int_payout_12plus")
+                }
+            
+        initialize_sidebet_button = st.button("Initialize Sidebet Simulator", use_container_width=True, key="init_sidebet_btn")
+        
+        if initialize_sidebet_button:
+            sim_config = SimulationConfig(
+                num_decks=int_num_decks,
+                num_hands=100000000,
+                player_hit_soft_17=int_player_hits_soft_17,
+                dealer_hit_soft_17=int_dealer_hits_soft_17,  
+                reshuffle_cutoff=int_reshuffle_threshold if int_shuffle_method != "Continuous shuffle" else 0,
+                hit_against_blackjack=int_hit_against_blackjack,
+                sidebet_payout_mode=int_sidebet_payout_mode,
+                sidebet_payouts=int_sidebet_payouts
+            )
+            
+            st.session_state.interactive_sidebet_simulator = InteractiveSidebetSimulator(sim_config)
+            st.session_state.interactive_sidebet_simulator.setup()
+            
+            st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.start_new_hand()
+            st.rerun()
+    
+    # Setup UI to deal specific hands if the simulator is initialized
+    if st.session_state.interactive_sidebet_simulator is not None:
+        with st.expander("Set Up Specific Hand", expanded=False):
+            st.markdown("Use this section to set up a specific starting hand configuration")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### Player Cards")
+                player_card1_rank = st.selectbox("Player Card 1 Rank", 
+                                              ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace"], 
+                                              key="player_card1_rank")
+                player_card1_suit = st.selectbox("Player Card 1 Suit", 
+                                              ["Hearts", "Diamonds", "Clubs", "Spades"], 
+                                              key="player_card1_suit")
+                
+                player_card2_rank = st.selectbox("Player Card 2 Rank", 
+                                              ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace"], 
+                                              key="player_card2_rank")
+                player_card2_suit = st.selectbox("Player Card 2 Suit", 
+                                              ["Hearts", "Diamonds", "Clubs", "Spades"], 
+                                              key="player_card2_suit")
+            
+            with col2:
+                st.markdown("### Dealer Cards")
+                dealer_card1_rank = st.selectbox("Dealer Card 1 Rank", 
+                                              ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace"], 
+                                              key="dealer_card1_rank")
+                dealer_card1_suit = st.selectbox("Dealer Card 1 Suit", 
+                                              ["Hearts", "Diamonds", "Clubs", "Spades"], 
+                                              key="dealer_card1_suit")
+                
+                dealer_card2_rank = st.selectbox("Dealer Card 2 Rank", 
+                                              ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace"], 
+                                              key="dealer_card2_rank")
+                dealer_card2_suit = st.selectbox("Dealer Card 2 Suit", 
+                                              ["Hearts", "Diamonds", "Clubs", "Spades"], 
+                                              key="dealer_card2_suit")
+            
+            setup_hand_btn = st.button("Set Up Specific Hand", use_container_width=True)
+            
+            if setup_hand_btn:
+                from src.game.card import Card
+                
+                # Create the cards
+                player_card1 = Card(player_card1_suit, player_card1_rank)
+                player_card2 = Card(player_card2_suit, player_card2_rank)
+                dealer_card1 = Card(dealer_card1_suit, dealer_card1_rank)
+                dealer_card2 = Card(dealer_card2_suit, dealer_card2_rank)
+                
+                # Set up the hand
+                st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.start_new_hand(
+                    player_initial_cards=[player_card1, player_card2],
+                    dealer_initial_cards=[dealer_card1, dealer_card2]
+                )
+                st.rerun()
+    
+    if st.session_state.interactive_sidebet_simulator is not None and st.session_state.sidebet_current_state is not None:
+        st.markdown("### Interactive Simulation Controls")
+        
+        # Create a 2-column layout for the main controls
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Input field for Hit
+            st.text_input("Hit", placeholder="Hit", disabled=True)
+        
+        with col2:
+            # Input field for Stand
+            st.text_input("Stand", placeholder="Stand", disabled=True)
+        
+        # Create a row for the current phase information that spans the full width
+        st.info(f"Current Phase: {st.session_state.sidebet_current_state['phase'].replace('_', ' ').title()}")
+        
+        # Create buttons row
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            if st.session_state.sidebet_current_state["phase"] == "init":
+                deal_button = st.button("Deal New Hand", key="sidebet_deal_btn", use_container_width=True, type="primary")
+                if deal_button:
+                    st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.deal_cards()
+                    st.rerun()
+            elif st.session_state.sidebet_current_state["phase"] == "player_turn":
+                hit_button = st.button("Hit", key="sidebet_hit_btn", use_container_width=True)
+                if hit_button:
+                    st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.player_hit()
+                    st.rerun()
+        
+        with col2:
+            if st.session_state.sidebet_current_state["phase"] == "player_turn":
+                stand_button = st.button("Stand", key="sidebet_stand_btn", use_container_width=True)
+                if stand_button:
+                    st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.player_stand()
+                    st.rerun()
+            elif st.session_state.sidebet_current_state["phase"] == "dealer_turn":
+                step_button = st.button("Dealer Step", key="sidebet_step_btn", use_container_width=True)
+                if step_button:
+                    st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.dealer_step()
+                    st.rerun()
+            elif st.session_state.sidebet_current_state["phase"] == "result":
+                next_hand_button = st.button("Next Hand", key="sidebet_next_hand_btn", use_container_width=True, type="primary")
+                if next_hand_button:
+                    st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.start_new_hand()
+                    st.rerun()
+        
+        # Show the current hand status
+        st.markdown("### Current Hand")
+        
+        state = st.session_state.sidebet_current_state
+        
+        # Create a progress bar for player hand
+        st.markdown('<div style="background-color: #22c55e; height: 4px; margin-bottom: 15px;"></div>', unsafe_allow_html=True)
+        
+        # Player hand section
+        st.markdown("**Player Hand: {}**".format(state["player_hands"][0]["value"] if state["player_hands"] else ""))
+        
+        # Display player cards in a row
+        if state["player_hands"]:
+            player_hand = state["player_hands"][0]
+            
+            # Display cards horizontally
+            cards_html = ""
+            for card in player_hand["cards"]:
+                cards_html += render_card(card)
+            
+            st.markdown(f'<div style="display: flex; gap: 10px; margin-bottom: 20px;">{cards_html}</div>', unsafe_allow_html=True)
+            
+        # Dealer hand section
+        st.markdown("**Dealer Hand: {}**".format(
+            state["dealer_hand"]["value"] if state["dealer_hand"] and state["phase"] in ["dealer_turn", "result"] else "?"
+        ))
+        
+        # Create a progress bar for dealer hand
+        st.markdown('<div style="background-color: #22c55e; height: 4px; margin-bottom: 15px;"></div>', unsafe_allow_html=True)
+        
+        # Display dealer cards in a row
+        if state["dealer_hand"]:
+            dealer_hand = state["dealer_hand"]
+            
+            # Display cards horizontally
+            cards_html = ""
+            
+            # In dealer turn or result phase, show all cards
+            if state["phase"] in ["dealer_turn", "result"]:
+                for card in dealer_hand["cards"]:
+                    cards_html += render_card(card)
+            else:
+                # In other phases, show only the first card and a face-down card
+                if dealer_hand["cards"]:
+                    cards_html += render_card(dealer_hand["cards"][0])
+                    cards_html += '<div class="card" style="background-color: #6B7280; color: white; height: 60px; width: 40px; display: flex; justify-content: center; align-items: center; border-radius: 5px; font-weight: bold;">?</div>'
+            
+            st.markdown(f'<div style="display: flex; gap: 10px; margin-bottom: 20px;">{cards_html}</div>', unsafe_allow_html=True)
+        
+        # Show status information
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if state["player_hands"] and state["player_hands"][0]:
+                player_hand = state["player_hands"][0]
+                if player_hand["is_blackjack"]:
+                    st.success("Player: Blackjack!")
+                elif player_hand["is_bust"]:
+                    st.error("Player: Bust!")
+                elif player_hand["is_soft"]:
+                    st.info("Player: Soft Hand")
+                    
+        with col2:
+            if state["dealer_hand"] and state["phase"] in ["dealer_turn", "result"]:
+                dealer_hand = state["dealer_hand"]
+                if dealer_hand["is_blackjack"]:
+                    st.success("Dealer: Blackjack!")
+                elif dealer_hand["is_bust"]:
+                    st.error("Dealer: Bust!")
+                elif dealer_hand["is_soft"]:
+                    st.info("Dealer: Soft Hand")
+                
+        # Show the result if available
+        if state["phase"] == "result" and state["result"]:
+            result = state["result"]
+            result_class = "result-win" if result["result"] == "player_win" else ("result-loss" if result["result"] == "dealer_win" else "result-push")
+            
+            st.markdown(f'<div class="result-badge {result_class}">{result["display_result"]}</div>', unsafe_allow_html=True)
+            
+            # Display sidebet result if it's a push
+            if state["sidebet_result"]["is_push"]:
+                sidebet = state["sidebet_result"]
+                sidebet_value = sidebet["value"]
+                total_cards = sidebet["total_cards"]
+                
+                # Determine the payout based on simulator mode
+                if st.session_state.interactive_sidebet_simulator.config.sidebet_payout_mode == "total":
+                    # Payout based on total value
+                    if sidebet["is_blackjack_push"]:
+                        sidebet_outcome = "Blackjack Push"
+                        payout_key = 'blackjack-blackjack'
+                    elif sidebet["is_bust_push"]:
+                        sidebet_outcome = "Bust Push"
+                        payout_key = 'bust-bust'
+                    else:
+                        sidebet_outcome = f"{sidebet_value} Push"
+                        payout_key = sidebet_value
+                    
+                    payout = st.session_state.interactive_sidebet_simulator.config.sidebet_payouts.get(payout_key, 0)
+                else:
+                    # Payout based on card count
+                    sidebet_outcome = f"{total_cards} Cards Push"
+                    payout_key = total_cards if total_cards < 12 else '12+'
+                    payout = st.session_state.interactive_sidebet_simulator.config.sidebet_payouts.get(payout_key, 0)
+                
+                st.markdown(f"""
+                <div style="background-color: #10B981; color: white; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                    <strong>Sidebet Win!</strong> {sidebet_outcome} - Pays {payout}:1
+                </div>
+                """, unsafe_allow_html=True)
+            elif state["phase"] == "result":
+                st.markdown(f"""
+                <div style="background-color: #EF4444; color: white; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                    <strong>Sidebet Loss!</strong> No Push
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Display stats
+        if "stats" in state:
+            stats = state["stats"]
+            
+            st.markdown("### Statistics")
+            
+            # Create a 3x2 grid for the statistics that matches the layout in the screenshot
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown("**Player Wins**")
+                st.markdown(f"<h2 style='margin:0; padding:0;'>{stats['player_wins']}</h2>", unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown("**Dealer Wins**")  
+                st.markdown(f"<h2 style='margin:0; padding:0;'>{stats['dealer_wins']}</h2>", unsafe_allow_html=True)
+                
+            with col3:
+                st.markdown("**Player Blackjacks**")
+                st.markdown(f"<h2 style='margin:0; padding:0;'>{stats.get('player_blackjacks', 0)}</h2>", unsafe_allow_html=True)
+                
+            st.markdown("<div style='height: 20px'></div>", unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown("**Hands Played**")
+                st.markdown(f"<h2 style='margin:0; padding:0;'>{stats['total_hands']}</h2>", unsafe_allow_html=True)
+                
+            with col2:
+                st.markdown("**Pushes**")
+                st.markdown(f"<h2 style='margin:0; padding:0;'>{stats['pushes']}</h2>", unsafe_allow_html=True)
+                
+            with col3:
+                st.markdown("**Dealer Blackjacks**")
+                st.markdown(f"<h2 style='margin:0; padding:0;'>{stats.get('dealer_blackjacks', 0)}</h2>", unsafe_allow_html=True)
+            
+            # Sidebet stats
+            if "sidebet_stats" in stats and stats["total_hands"] > 0:
+                sidebet_stats = stats["sidebet_stats"]
+                
+                st.markdown("### Sidebet Statistics")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("Total Pushes", f"{sidebet_stats['total_pushes']} ({sidebet_stats['total_pushes']/stats['total_hands']*100:.1f}%)" if stats["total_hands"] > 0 else "0")
+                
+                with col2:
+                    edge = sidebet_stats.get("edge")
+                    st.metric("Sidebet Edge", f"{edge:.2f}%" if edge is not None else "N/A")
+                
+                # Show push breakdown
+                if st.session_state.interactive_sidebet_simulator.config.sidebet_payout_mode == "total":
+                    # Create a table for push breakdown by value
+                    if sidebet_stats.get("by_value"):
+                        pushes_by_value = sidebet_stats["by_value"]
+                        st.markdown("#### Pushes by Hand Value")
+                        value_data = []
+                        for value, count in pushes_by_value.items():
+                            value_data.append({
+                                "Value": value,
+                                "Count": count
+                            })
+                        
+                        value_df = pd.DataFrame(value_data)
+                        st.dataframe(value_df)
+                else:
+                    # Create a table for push breakdown by card count
+                    if sidebet_stats.get("by_cards"):
+                        pushes_by_cards = sidebet_stats["by_cards"]
+                        st.markdown("#### Pushes by Card Count")
+                        card_data = []
+                        for cards, count in pushes_by_cards.items():
+                            card_data.append({
+                                "Card Count": cards,
+                                "Count": count
+                            })
+                        
+                        card_df = pd.DataFrame(card_data)
+                        st.dataframe(card_df)
+        
+        # Hand history for sidebet
+        if state["history_length"] > 0:
+            with st.expander("Hand History", expanded=False):
+                history = st.session_state.interactive_sidebet_simulator.get_hand_history()
+                history_df = pd.DataFrame(history)
+                
+                history_df["player_cards"] = history_df["player_hand"].apply(lambda x: ", ".join(x))
+                history_df["dealer_cards"] = history_df["dealer_hand"].apply(lambda x: ", ".join(x))
+                
+                history_df["outcome"] = history_df["result"].map({
+                    "player_win": "Player Win", 
+                    "dealer_win": "Dealer Win",
+                    "push": "Push"
+                })
+                
+                display_df = history_df[["player_value", "dealer_value", "outcome", "player_cards", "dealer_cards"]]
+                display_df.index = display_df.index + 1  # 1-based indexing for hand number
+                
+                st.dataframe(display_df.iloc[::-1])
+        
+        # Auto-play for sidebet
+        with st.expander("Auto-play Options", expanded=False):
+            st.write("Set up auto-play to automatically simulate multiple hands in succession.")
+            
+            num_auto_hands = st.number_input(
+                "Number of Hands to Auto-Play", 
+                min_value=1,
+                max_value=100,
+                value=10,
+                key="auto_play_hands_2"
+            )
+            
+            delay = st.slider(
+                "Delay Between Steps (seconds)",
+                min_value=0.1,
+                max_value=2.0,
+                value=0.5,
+                step=0.1,
+                key="delay_slider_2"
+            )
+            
+            auto_play = st.button("Start Auto-Play", key="sidebet_auto_play_btn")
+            
+            if auto_play:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                for i in range(num_auto_hands):
+                    # Start a new hand
+                    st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.start_new_hand()
+                    status_text.text(f"Hand {i+1}/{num_auto_hands}: Dealing cards...")
+                    time.sleep(delay)
+                    
+                    # Deal cards
+                    st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.deal_cards()
+                    
+                    # If not in player_turn phase, the hand might already be complete (blackjack)
+                    if st.session_state.sidebet_current_state["phase"] == "player_turn":
+                        status_text.text(f"Hand {i+1}/{num_auto_hands}: Player's turn...")
+                        time.sleep(delay)
+                        
+                        # Play player's hand
+                        while st.session_state.sidebet_current_state["phase"] == "player_turn":
+                            st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.player_hit()
+                            time.sleep(delay/2)
+                    
+                    # If needed, play dealer's hand
+                    if st.session_state.sidebet_current_state["phase"] == "dealer_turn":
+                        status_text.text(f"Hand {i+1}/{num_auto_hands}: Dealer's turn...")
+                        time.sleep(delay)
+                        
+                        while st.session_state.sidebet_current_state["phase"] == "dealer_turn":
+                            st.session_state.sidebet_current_state = st.session_state.interactive_sidebet_simulator.dealer_step()
+                            time.sleep(delay/2)
+                    
+                    # Show result
+                    status_text.text(f"Hand {i+1}/{num_auto_hands}: Complete!")
+                    time.sleep(delay)
+                    
+                    # Update progress bar
+                    progress_bar.progress((i + 1) / num_auto_hands)
+                
+                status_text.text(f"Auto-play complete! {num_auto_hands} hands played.")
+                st.rerun()
+    else:
+        st.info("Initialize the simulator to begin playing hands interactively.")
+
+
+with tab4:
     st.markdown('<div class="section-header">Data Visualization</div>', unsafe_allow_html=True)
     
     if "latest_results" in st.session_state and st.session_state.latest_results.get("detailed_df") is not None:
@@ -1329,7 +2220,7 @@ with tab3:
         else:
             st.info("Run a simulation to see visualizations here.")
 
-with tab4:
+with tab5:
     st.markdown('<div class="section-header">Previous Simulation Results</div>', unsafe_allow_html=True)
     
     # Get list of previous simulation files
@@ -1347,7 +2238,7 @@ with tab4:
                                             format_func=lambda x: f"Simulation {x}")
             
             selected_result = results[result_options[selected_result_key]]
-            timestamp = selected_result['timestamp']
+            timestamp = selected_result['timestamp'];
             
             # Display summary
             if selected_result['summary_file']:
@@ -1643,4 +2534,3 @@ with tab4:
 # Footer
 st.markdown("---")
 st.markdown("Blackjack Simulator © 2025 | Created with Streamlit")
-

@@ -1,0 +1,23 @@
+Lets include sidebet:
+
+the sidebet is going to payout when the player and dealer push (tie). the main hand wont be simulated at the same time. this can either be a separate page or an addition to the main page but should have full simulation + hand by hand capabilities.
+
+5. What is the expected input and output?
+Controls
+- a setting to payout based on either dealer and player total or the total number of cards between the player and dealer it took to get to a push.
+- a mode to payout X:1 for the following outcomes
+] when the player and dealer total is selected, (17v17, 18v18, 19v19, 20v20, 21v21, bust-bust and blackjack-v-blackjack)
+] when the total cards between the player and dealer is selected, (4, 5, 6, 7, 8, 9, 10, 11, and 12+ cards)
+- the same controls as the main bet minus commission and blackjack payout
+
+Output 
+- how often the player and dealer tie on specific numbers (21 does not include a blackjack-v-blackjack tie but does include a ties where one side has blackjack)
+- how often they tie on a blackjack
+- how many cards it takes them to tie
+- total push rate
+- house edge
+
+Misc changes to rest of the sim
+- a control which allows the player to hit to attempt to get to 21 when the other side has a blackjack. this should not result in a push if they get to 21. it just allows them to draw cards. it should be off by default.
+- an option to set up the exact hand for the player and dealer in the hand by hand sim.
+- an output which shows how many blackjacks the player and dealer each got

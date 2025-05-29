@@ -13,7 +13,10 @@ class SimulationConfig:
                  blackjack_payout=1.0,
                  num_players=1,
                  player_hit_rules=None,
-                 commission_on_blackjack=True):
+                 commission_on_blackjack=True,
+                 hit_against_blackjack=False,
+                 sidebet_payout_mode="total",
+                 sidebet_payouts=None):
         """
         Initialize simulation configuration.
         
@@ -28,6 +31,9 @@ class SimulationConfig:
             num_players (int): Number of players at the table
             player_hit_rules (dict): Custom player hitting rules
             commission_on_blackjack (bool): Whether commission is applied to blackjack wins
+            hit_against_blackjack (bool): Whether the player can hit against a dealer blackjack
+            sidebet_payout_mode (str): Mode for sidebet payouts ("total" for hand totals or "cards" for card count)
+            sidebet_payouts (dict): Payout multipliers for different push types
         """
         self.num_hands = num_hands
         self.num_decks = num_decks
@@ -39,6 +45,25 @@ class SimulationConfig:
         self.num_players = num_players
         self.player_hit_rules = player_hit_rules or {}
         self.commission_on_blackjack = commission_on_blackjack
+        self.hit_against_blackjack = hit_against_blackjack
+        
+        # Sidebet configuration
+        self.sidebet_payout_mode = sidebet_payout_mode
+        
+        # Default sidebet payouts if none provided
+        if sidebet_payouts is None:
+            if sidebet_payout_mode == "total":
+                self.sidebet_payouts = {
+                    17: 1, 18: 1, 19: 1, 20: 1, 21: 1, 
+                    'bust-bust': 1, 'blackjack-blackjack': 1
+                }
+            else:  # card count mode
+                self.sidebet_payouts = {
+                    4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 
+                    9: 1, 10: 1, 11: 1, '12+': 1
+                }
+        else:
+            self.sidebet_payouts = sidebet_payouts
         
     def get_commission_multiplier(self):
         """
@@ -54,6 +79,8 @@ class SimulationConfig:
         hit_rules_str = "Custom" if self.player_hit_rules else "Default"
         shuffle_type = "Continuous shuffle" if self.reshuffle_cutoff == 0 else f"Reshuffle at {self.reshuffle_cutoff} cards"
         
+        sidebet_mode = "Hand Total" if self.sidebet_payout_mode == "total" else "Card Count"
+        
         return (f"Simulation Config:\n"
                 f"  Hands: {self.num_hands}\n"
                 f"  Decks: {self.num_decks}\n"
@@ -64,7 +91,10 @@ class SimulationConfig:
                 f"  Commission on blackjack: {self.commission_on_blackjack}\n"
                 f"  Blackjack payout: {self.blackjack_payout}:1\n"
                 f"  Players: {self.num_players}\n"
-                f"  Hit rules: {hit_rules_str}")
+                f"  Hit rules: {hit_rules_str}\n"
+                f"  Hit against dealer blackjack: {self.hit_against_blackjack}\n"
+                f"  Sidebet payout mode: {sidebet_mode}\n"
+                f"  Sidebet payouts: {self.sidebet_payouts}")
                 
     def to_dict(self):
         """
@@ -91,5 +121,8 @@ class SimulationConfig:
             'num_players': self.num_players,
             'player_hit_rules': serializable_hit_rules,
             'commission_on_blackjack': self.commission_on_blackjack,
+            'hit_against_blackjack': self.hit_against_blackjack,
+            'sidebet_payout_mode': self.sidebet_payout_mode,
+            'sidebet_payouts': self.sidebet_payouts,
             'shuffle_type': "Continuous shuffle" if self.reshuffle_cutoff == 0 else f"Reshuffle at {self.reshuffle_cutoff} cards"
         }

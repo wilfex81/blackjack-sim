@@ -1,0 +1,29 @@
+Simulation Results Summary
+=========================
+
+Simulation Config:
+  Hands: 1000000
+  Decks: 6
+  Player hit soft 17: False
+  Dealer hit soft 17: False
+  Shuffle: Reshuffle at 52 cards
+  Commission: 5.0%
+  Commission on blackjack: True
+  Blackjack payout: 1.0:1
+  Players: 1
+  Hit rules: Default
+  Hit against dealer blackjack: False
+  Sidebet payout mode: Hand Total
+  Sidebet payouts: {17: 1, 18: 1, 19: 1, 20: 1, 21: 1, 'bust-bust': 1, 'blackjack-blackjack': 1}
+
+Total hands: 1000000
+Simulation time: 37.40 seconds
+
+Player wins: 410784 (41.08%)
+Dealer wins: 410809 (41.08%)
+Pushes: 178407 (17.84%)
+
+Player busts: 268720 (26.87%)
+Dealer busts: 268871 (26.89%)
+
+House edge: 1.84%
