@@ -158,9 +158,44 @@ class StreamlitReportGenerator:
             f"",
             f"Player busts: {self.results['player_busts']} ({100 * self.results['player_busts'] / total_hands:.2f}%)",
             f"Dealer busts: {self.results['dealer_busts']} ({100 * self.results['dealer_busts'] / total_hands:.2f}%)",
-            f"",
-            f"House edge: {self.results['house_edge']:.2f}%"
+            f""
         ]
+        
+        # Add blackjack statistics if available
+        if 'blackjacks' in self.results:
+            blackjack_count = self.results.get('blackjacks', 0)
+            blackjack_pct = 100 * blackjack_count / total_hands if total_hands > 0 else 0
+            summary.append(f"Blackjacks: {blackjack_count} ({blackjack_pct:.2f}%)")
+            
+            # Count blackjack pushes from detailed outcome data
+            blackjack_pushes = 0
+            for (player_total, dealer_total, result), count in self.results.get('outcome_details', {}).items():
+                if result == "push" and player_total == 21 and dealer_total == 21:
+                    # This is an approximation as we can't distinguish blackjack vs non-blackjack 21 in outcome_details
+                    blackjack_pushes += count
+            
+            blackjack_push_pct = 100 * blackjack_pushes / total_hands if total_hands > 0 else 0
+            summary.append(f"Blackjack pushes: {blackjack_pushes} ({blackjack_push_pct:.2f}%)")
+            summary.append(f"")
+        # Add sidebet-specific blackjack statistics if available
+        elif 'player_blackjacks' in self.results and 'dealer_blackjacks' in self.results:
+            player_bj_count = self.results.get('player_blackjacks', 0)
+            dealer_bj_count = self.results.get('dealer_blackjacks', 0)
+            player_bj_pct = 100 * player_bj_count / total_hands if total_hands > 0 else 0
+            dealer_bj_pct = 100 * dealer_bj_count / total_hands if total_hands > 0 else 0
+            
+            summary.append(f"Player blackjacks: {player_bj_count} ({player_bj_pct:.2f}%)")
+            summary.append(f"Dealer blackjacks: {dealer_bj_count} ({dealer_bj_pct:.2f}%)")
+            
+            # Get blackjack-blackjack pushes from pushes_by_value if available
+            if 'pushes_by_value' in self.results and 'blackjack' in self.results['pushes_by_value']:
+                bj_pushes = self.results['pushes_by_value']['blackjack']
+                bj_push_pct = 100 * bj_pushes / total_hands if total_hands > 0 else 0
+                summary.append(f"Blackjack pushes: {bj_pushes} ({bj_push_pct:.2f}%)")
+            
+            summary.append(f"")
+            
+        summary.append(f"House edge: {self.results['house_edge']:.2f}%")
 
         with open(filepath, 'w') as f:
             f.write("\n".join(summary))
@@ -271,7 +306,56 @@ class StreamlitReportGenerator:
                 })
     
         return pd.DataFrame(detailed_data)
+    
+    def generate_detailed_push_matrix_csv(self, filename):
+        """Generate a CSV file with detailed push statistics correlating hand total and card count"""
+        if not self.results or 'pushes_detail_matrix' not in self.results:
+            raise ValueError("No push detail matrix available in the results")
 
+        if not os.path.exists(self.results_dir):
+            os.makedirs(self.results_dir)
+            
+        filepath = os.path.join(self.results_dir, filename)
+        
+        # Get all unique hand values and card counts
+        hand_values = set()
+        card_counts = set()
+        
+        for (value, count) in self.results['pushes_detail_matrix'].keys():
+            hand_values.add(value)
+            card_counts.add(count)
+            
+        # Sort the values and counts for better readability
+        # Convert to list and sort
+        hand_values = sorted([v for v in hand_values if isinstance(v, int)] + 
+                            [v for v in hand_values if not isinstance(v, int)],
+                            key=lambda x: float('inf') if not isinstance(x, int) else x)
+        
+        card_counts = sorted([c for c in card_counts if isinstance(c, int)] + 
+                            [c for c in card_counts if not isinstance(c, int)])
+        
+        # Create a 2D matrix representation
+        matrix = {}
+        for value in hand_values:
+            matrix[value] = {}
+            for count in card_counts:
+                matrix[value][count] = self.results['pushes_detail_matrix'].get((value, count), 0)
+        
+        with open(filepath, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            header = ['Hand Value\\Card Count'] + [str(count) for count in card_counts]
+            writer.writerow(header)
+            
+            for value in hand_values:
+                row = [str(value)]
+                for count in card_counts:
+                    row.append(matrix[value][count])
+                writer.writerow(row)
+                
+        print(f"Detailed push matrix saved to {filepath}")
+        return filepath
+    
 st.set_page_config(
     page_title="Blackjack Simulator",
     page_icon="🃏",
@@ -537,6 +621,17 @@ with tab1:
         push_rate = results['pushes'] / total_hands if total_hands > 0 else 0
         player_bust_rate = results['player_busts'] / total_hands if total_hands > 0 else 0
         dealer_bust_rate = results['dealer_busts'] / total_hands if total_hands > 0 else 0
+        blackjack_rate = results.get('blackjacks', 0) / total_hands if total_hands > 0 else 0
+        
+        # Count blackjack pushes from detailed outcome data
+        blackjack_pushes = 0
+        for (player_total, dealer_total, result), count in results.get('outcome_details', {}).items():
+            if result == "push" and player_total == 21 and dealer_total == 21:
+                # This is an approximation as we can't distinguish blackjack vs non-blackjack 21 in outcome_details
+                blackjack_pushes += count
+        
+        blackjack_push_rate = blackjack_pushes / total_hands if total_hands > 0 else 0
+        
         # Raw edge (basic win/loss difference before commission)
         raw_edge = (player_win_rate - dealer_win_rate) * 100
         
@@ -555,7 +650,9 @@ with tab1:
             "dealer_win_rate": dealer_win_rate,
             "push_rate": push_rate,
             "player_bust_rate": player_bust_rate,
-            "dealer_bust_rate": dealer_bust_rate
+            "dealer_bust_rate": dealer_bust_rate,
+            "blackjack_rate": blackjack_rate,
+            "blackjack_push_rate": blackjack_push_rate
         }
         
         if config["generate_visuals"]:
@@ -628,6 +725,20 @@ with tab1:
         with col6:
             st.markdown('<div class="metric-container">', unsafe_allow_html=True)
             st.metric("Dealer Bust Rate", f"{results['dealer_bust_rate']*100:.2f}%")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # Add blackjack statistics
+        col7, col8 = st.columns(2)
+        with col7:
+            st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+            st.metric("Blackjack Rate", f"{results['blackjack_rate']*100:.2f}%",
+                     help="Percentage of hands where player or dealer got a blackjack")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with col8:
+            st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+            st.metric("Blackjack Push Rate", f"{results['blackjack_push_rate']*100:.2f}%",
+                     help="Percentage of hands where both player and dealer got blackjack")
             st.markdown('</div>', unsafe_allow_html=True)
             
         if save_results:
@@ -1301,6 +1412,8 @@ with tab3:
                 report_generator.generate_detailed_csv(f"sidebet_sim_detailed_{timestamp}.csv")
                 report_generator.generate_matrix_csv(f"sidebet_sim_matrix_{timestamp}.csv")
                 report_generator.generate_summary(f"sidebet_sim_summary_{timestamp}.txt")
+                # Generate the new detailed push matrix
+                report_generator.generate_detailed_push_matrix_csv(f"sidebet_push_matrix_{timestamp}.csv")
             
             # Display results
             st.success(f"Simulation completed! {num_hands} hands simulated in {simulation_time:.2f} seconds.")
@@ -1419,6 +1532,7 @@ with tab3:
                 - Detailed CSV: `results/sidebet_sim_detailed_{timestamp}.csv`
                 - Matrix CSV: `results/sidebet_sim_matrix_{timestamp}.csv`
                 - Summary: `results/sidebet_sim_summary_{timestamp}.txt`
+                - Detailed Push Matrix: `results/sidebet_push_matrix_{timestamp}.csv` (correlating hand totals and card counts)
                 """)
     
     # Add a horizontal separator
@@ -2010,23 +2124,29 @@ with tab4:
             dealer_busts = detailed_df[detailed_df["dealer_total"] > 21]
             
             if len(dealer_busts) > 0:
-                bust_by_upcard = dealer_busts.groupby("dealer_upcard").size().reset_index()
-                bust_by_upcard.columns = ["Dealer Upcard", "Bust Count"]
+                # Check if dealer_upcard column exists and has meaningful values
+                if "dealer_upcard" in detailed_df.columns and detailed_df["dealer_upcard"].nunique() > 1:
+                    bust_by_upcard = dealer_busts.groupby("dealer_upcard").size().reset_index()
+                    bust_by_upcard.columns = ["Dealer Upcard", "Bust Count"]
+                    
+                    total_by_upcard = detailed_df.groupby("dealer_upcard").size().reset_index()
+                    total_by_upcard.columns = ["Dealer Upcard", "Total Count"]
                 
-                total_by_upcard = detailed_df.groupby("dealer_upcard").size().reset_index()
-                total_by_upcard.columns = ["Dealer Upcard", "Total Count"]
-                
-                bust_analysis = pd.merge(bust_by_upcard, total_by_upcard, on="Dealer Upcard")
-                bust_analysis["Bust Percentage"] = (bust_analysis["Bust Count"] / bust_analysis["Total Count"] * 100).round(2)
-                
-                sns.barplot(x="Dealer Upcard", y="Bust Percentage", data=bust_analysis, palette="viridis", ax=ax)
-                ax.set_title("Dealer Bust Percentage by Upcard")
-                ax.set_ylabel("Bust Percentage (%)")
-                
-                plt.tight_layout()
-                st.pyplot(fig)
-                
-                st.dataframe(bust_analysis)
+                    bust_analysis = pd.merge(bust_by_upcard, total_by_upcard, on="Dealer Upcard")
+                    bust_analysis["Bust Percentage"] = (bust_analysis["Bust Count"] / bust_analysis["Total Count"] * 100).round(2)
+                    
+                    sns.barplot(x="Dealer Upcard", y="Bust Percentage", data=bust_analysis, palette="viridis", ax=ax)
+                    ax.set_title("Dealer Bust Percentage by Upcard")
+                    ax.set_ylabel("Bust Percentage (%)")
+                    
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    
+                    st.dataframe(bust_analysis)
+                else:
+                    # If dealer_upcard is not usable, create a simpler analysis
+                    st.write(f"Total dealer busts: {len(dealer_busts)} ({len(dealer_busts)/len(detailed_df)*100:.2f}%)")
+                    st.info("Detailed upcard analysis not available - dealer upcard data is missing or uniform.")
             else:
                 st.info("No dealer busts found in this simulation.")
         
@@ -2314,7 +2434,7 @@ with tab5:
                         # Create a pivot table of outcomes by player total
                         pivot_data = detailed_df.pivot_table(
                             index="player_total", 
-                            columns="outcome", 
+                            columns="result", 
                             aggfunc="size", 
                             fill_value=0
                         )
@@ -2340,27 +2460,33 @@ with tab5:
                         dealer_busts = detailed_df[detailed_df["dealer_total"] > 21]
                         
                         if len(dealer_busts) > 0:
-                            bust_by_upcard = dealer_busts.groupby("dealer_upcard").size().reset_index()
-                            bust_by_upcard.columns = ["Dealer Upcard", "Bust Count"]
-                            
-                            # Calculate total hands for each upcard
-                            total_by_upcard = detailed_df.groupby("dealer_upcard").size().reset_index()
-                            total_by_upcard.columns = ["Dealer Upcard", "Total Count"]
-                            
-                            # Merge and calculate percentages
-                            bust_analysis = pd.merge(bust_by_upcard, total_by_upcard, on="Dealer Upcard")
-                            bust_analysis["Bust Percentage"] = (bust_analysis["Bust Count"] / bust_analysis["Total Count"] * 100).round(2)
-                            
-                            # Plot
-                            sns.barplot(x="Dealer Upcard", y="Bust Percentage", data=bust_analysis, palette="viridis", ax=ax)
-                            ax.set_title("Dealer Bust Percentage by Upcard")
-                            ax.set_ylabel("Bust Percentage (%)")
-                            
-                            plt.tight_layout()
-                            st.pyplot(fig)
-                            
-                            # Show the raw data
-                            st.dataframe(bust_analysis)
+                            # Check if dealer_upcard column exists and has meaningful values
+                            if "dealer_upcard" in detailed_df.columns and detailed_df["dealer_upcard"].nunique() > 1:
+                                bust_by_upcard = dealer_busts.groupby("dealer_upcard").size().reset_index()
+                                bust_by_upcard.columns = ["Dealer Upcard", "Bust Count"]
+                                
+                                # Calculate total hands for each upcard
+                                total_by_upcard = detailed_df.groupby("dealer_upcard").size().reset_index()
+                                total_by_upcard.columns = ["Dealer Upcard", "Total Count"]
+                                
+                                # Merge and calculate percentages
+                                bust_analysis = pd.merge(bust_by_upcard, total_by_upcard, on="Dealer Upcard")
+                                bust_analysis["Bust Percentage"] = (bust_analysis["Bust Count"] / bust_analysis["Total Count"] * 100).round(2)
+                                
+                                # Plot
+                                sns.barplot(x="Dealer Upcard", y="Bust Percentage", data=bust_analysis, palette="viridis", ax=ax)
+                                ax.set_title("Dealer Bust Percentage by Upcard")
+                                ax.set_ylabel("Bust Percentage (%)")
+                                
+                                plt.tight_layout()
+                                st.pyplot(fig)
+                                
+                                # Show the raw data
+                                st.dataframe(bust_analysis)
+                            else:
+                                # If dealer_upcard is not usable, create a simpler analysis
+                                st.write(f"Total dealer busts: {len(dealer_busts)} ({len(dealer_busts)/len(detailed_df)*100:.2f}%)")
+                                st.info("Detailed upcard analysis not available - dealer upcard data is missing or uniform.")
                         else:
                             st.info("No dealer busts found in this simulation.")
             

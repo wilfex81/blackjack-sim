@@ -27,6 +27,7 @@ class SidebetSimulator(BlackjackSimulator):
             'total_pushes': 0,
             'pushes_by_value': {17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 'bust': 0, 'blackjack': 0},
             'pushes_by_card_count': {4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, '12+': 0},
+            'pushes_detail_matrix': {},  # Detailed breakdown: {(value_type, card_count): count}
             'sidebet_wins': 0,
             'sidebet_payouts': 0,
             'sidebet_edge': 0,
@@ -124,20 +125,39 @@ class SidebetSimulator(BlackjackSimulator):
         if result == "push":
             self.results['total_pushes'] += 1
             
-            # Track pushes by value
+            # Determine value type for categorization
+            value_type = None
             if player_value > 21:  # Both busted
+                value_type = 'bust'
                 self.results['pushes_by_value']['bust'] += 1
             elif player_hand.is_blackjack() and dealer_hand.is_blackjack():
+                value_type = 'blackjack'
                 self.results['pushes_by_value']['blackjack'] += 1
+            elif player_value == 21:
+                # Differentiate between blackjack and non-blackjack 21
+                if player_hand.is_blackjack() or dealer_hand.is_blackjack():
+                    # This is a case where one side has blackjack and other has 21
+                    value_type = '21_with_bj'
+                else:
+                    value_type = 21
+                self.results['pushes_by_value'][21] += 1
             elif player_value in self.results['pushes_by_value']:
+                value_type = player_value
                 self.results['pushes_by_value'][player_value] += 1
                 
             # Track pushes by card count
             total_cards = len(player_hand.cards) + len(dealer_hand.cards)
+            card_count_key = '12+' if total_cards >= 12 else total_cards
             if total_cards >= 12:
                 self.results['pushes_by_card_count']['12+'] += 1
             elif total_cards in self.results['pushes_by_card_count']:
                 self.results['pushes_by_card_count'][total_cards] += 1
+                
+            # Update the detailed matrix
+            matrix_key = (value_type, card_count_key)
+            if matrix_key not in self.results['pushes_detail_matrix']:
+                self.results['pushes_detail_matrix'][matrix_key] = 0
+            self.results['pushes_detail_matrix'][matrix_key] += 1
                 
             # Calculate sidebet payout based on configuration
             payout_multiplier = 0
