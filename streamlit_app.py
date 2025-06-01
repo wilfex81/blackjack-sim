@@ -907,7 +907,7 @@ with tab2:
                 help="Format: 'hard:16,10:hit;soft:17:hit' means hit on hard 16 when dealer shows 10, and hit on soft 17",
                 key="interactive_custom_hit_rules"
             )
-            
+        
         initialize_button = st.button("Initialize Simulator", use_container_width=True)
         
         if initialize_button:
@@ -1287,6 +1287,14 @@ with tab3:
         player_hits_soft_17 = st.checkbox("Player Hits Soft 17", value=False, key="sidebet_player_hits_soft17")
         dealer_hits_soft_17 = st.checkbox("Dealer Hits Soft 17", value=False, key="sidebet_dealer_hits_soft17")
         
+        num_players = st.number_input(
+            "Number of Players",
+            min_value=1,
+            max_value=7,
+            value=1,
+            key="sidebet_num_players"
+        )
+        
         hit_against_blackjack = st.checkbox(
             "Allow Hit Against Dealer Blackjack", 
             value=False,
@@ -1381,6 +1389,7 @@ with tab3:
             sim_config = SimulationConfig(
                 num_decks=num_decks,
                 num_hands=num_hands,
+                num_players=num_players,
                 player_hit_soft_17=player_hits_soft_17,
                 dealer_hit_soft_17=dealer_hits_soft_17,  
                 reshuffle_cutoff=reshuffle_threshold if shuffle_method != "Continuous shuffle" else 0,
@@ -1578,6 +1587,14 @@ with tab3:
                 key="int_sidebet_player_hits_soft_17"
             )
             
+            int_num_players = st.number_input(
+                "Number of Players",
+                min_value=1,
+                max_value=7,
+                value=1,
+                key="int_sidebet_num_players"
+            )
+            
             int_hit_against_blackjack = st.checkbox(
                 "Allow Hit Against Dealer Blackjack", 
                 value=False,
@@ -1640,6 +1657,7 @@ with tab3:
             sim_config = SimulationConfig(
                 num_decks=int_num_decks,
                 num_hands=100000000,
+                num_players=int_num_players,
                 player_hit_soft_17=int_player_hits_soft_17,
                 dealer_hit_soft_17=int_dealer_hits_soft_17,  
                 reshuffle_cutoff=int_reshuffle_threshold if int_shuffle_method != "Continuous shuffle" else 0,

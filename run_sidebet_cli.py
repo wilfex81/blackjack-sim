@@ -20,6 +20,7 @@ def parse_arguments():
     # Basic configuration
     parser.add_argument('--num-hands', type=int, default=10000, help='Number of hands to simulate')
     parser.add_argument('--num-decks', type=int, default=6, help='Number of decks')
+    parser.add_argument('--num-players', type=int, default=1, help='Number of players at the table')
     parser.add_argument('--player-hits-soft-17', action='store_true', help='Player hits on soft 17')
     parser.add_argument('--dealer-hits-soft-17', action='store_true', help='Dealer hits on soft 17')
     parser.add_argument('--reshuffle-threshold', type=int, default=52, help='Reshuffle threshold (cards remaining)')
@@ -98,6 +99,7 @@ def main():
         sim_config = SimulationConfig(
             num_decks=args.num_decks,
             num_hands=args.num_hands,
+            num_players=args.num_players,
             player_hit_soft_17=args.player_hits_soft_17,
             dealer_hit_soft_17=args.dealer_hits_soft_17,  
             reshuffle_cutoff=0 if args.continuous_shuffle else args.reshuffle_threshold,

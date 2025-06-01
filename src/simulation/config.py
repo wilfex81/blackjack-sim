@@ -126,3 +126,65 @@ class SimulationConfig:
             'sidebet_payouts': self.sidebet_payouts,
             'shuffle_type': "Continuous shuffle" if self.reshuffle_cutoff == 0 else f"Reshuffle at {self.reshuffle_cutoff} cards"
         }
+        
+    @classmethod
+    def from_dict(cls, config_dict):
+        """
+        Create a SimulationConfig instance from a dictionary.
+        
+        Args:
+            config_dict (dict): Dictionary representation of configuration
+            
+        Returns:
+            SimulationConfig: New instance with the specified configuration
+        """
+        # Process hit rules if they exist in the dict
+        hit_rules = config_dict.get('player_hit_rules', {})
+        processed_hit_rules = {}
+        
+        for key, value in hit_rules.items():
+            # Check if the key is a string representation of a tuple
+            if key.startswith('(') and key.endswith(')'):
+                # Convert string representation back to tuple
+                try:
+                    # Evaluate the string as a tuple
+                    tuple_key = eval(key)
+                    processed_hit_rules[tuple_key] = value
+                except:
+                    # If evaluation fails, keep as string
+                    processed_hit_rules[key] = value
+            else:
+                processed_hit_rules[key] = value
+        
+        # Process sidebet payouts
+        sidebet_payouts = config_dict.get('sidebet_payouts', None)
+        processed_sidebet_payouts = {}
+        
+        if sidebet_payouts is not None:
+            for key, value in sidebet_payouts.items():
+                # Try to convert numeric keys from strings to integers
+                try:
+                    if key.isdigit():
+                        processed_sidebet_payouts[int(key)] = value
+                    else:
+                        processed_sidebet_payouts[key] = value
+                except (AttributeError, ValueError):
+                    # If conversion fails, keep the original key
+                    processed_sidebet_payouts[key] = value
+                
+        # Create instance with values from dict, using default values for missing keys
+        return cls(
+            num_hands=config_dict.get('num_hands', 100000000),
+            num_decks=config_dict.get('num_decks', 6),
+            player_hit_soft_17=config_dict.get('player_hit_soft_17', False),
+            dealer_hit_soft_17=config_dict.get('dealer_hit_soft_17', False),
+            reshuffle_cutoff=config_dict.get('reshuffle_cutoff', 52),
+            commission_pct=config_dict.get('commission_pct', 5.0),
+            blackjack_payout=config_dict.get('blackjack_payout', 1.0),
+            num_players=config_dict.get('num_players', 1),
+            player_hit_rules=processed_hit_rules,
+            commission_on_blackjack=config_dict.get('commission_on_blackjack', True),
+            hit_against_blackjack=config_dict.get('hit_against_blackjack', False),
+            sidebet_payout_mode=config_dict.get('sidebet_payout_mode', 'total'),
+            sidebet_payouts=processed_sidebet_payouts if processed_sidebet_payouts else None
+        )
