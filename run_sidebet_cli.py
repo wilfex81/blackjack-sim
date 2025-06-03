@@ -195,8 +195,10 @@ def generate_detailed_push_matrix_csv(results, filepath):
                         [v for v in hand_values if not isinstance(v, int)],
                         key=lambda x: float('inf') if not isinstance(x, int) else x)
     
-    card_counts = sorted([c for c in card_counts if isinstance(c, int)] + 
-                        [c for c in card_counts if not isinstance(c, int)])
+    # Sort card counts with integers first (in numeric order) followed by non-integers
+    int_counts = sorted([c for c in card_counts if isinstance(c, int)])
+    non_int_counts = sorted([c for c in card_counts if not isinstance(c, int)])
+    card_counts = int_counts + non_int_counts
     
     # Create a 2D matrix representation
     matrix = {}
